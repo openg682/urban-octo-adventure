@@ -66,7 +66,7 @@ class Trader:
             return ema
 
         # Initialize ResinStrategy
-        resin_strategy = self.ResinStrategy()
+        resin_strategy = ResinStrategy()
 
         # Define price ranges for KELP and SQUID_INK
         kelp_price_range = (1990, 2050)  # KELP should stay between 2015 ± 15
@@ -105,88 +105,45 @@ class Trader:
                 resin_strategy.update(mid_price)
                 orders.extend(resin_strategy.generate_orders(order_depth, position))
 
-            # Logic for KELP
+            # Logic for KELP and SQUID_INK using price ranges and standard deviations
             elif product == "KELP":
-                if kelp_price_range[0] <= mid_price <= kelp_price_range[1]:
-                    if len(prices) >= long_span:
-                        prices_np = np.array(prices)
+                # Calculate the mean and standard deviation of the price history for KELP
+                mean_price = np.mean(prices)
+                std_dev = np.std(prices)
 
-                        # Calculate short-term and long-term EMAs
-                        ema_short = compute_ema(prices_np[-short_span:], short_span)
-                        ema_long = compute_ema(prices_np[-long_span:], long_span)
-                        momentum = (prices_np[-1] - prices_np[-2]) / prices_np[-2]
+                # Calculate upper and lower price thresholds (±1 standard deviation)
+                upper_threshold = mean_price + std_dev
+                lower_threshold = mean_price - std_dev
 
-                        # Calculate volatility
-                        if len(prices_np) >= vol_window + 1:
-                            returns = np.diff(prices_np[-(vol_window+1):]) / prices_np[-(vol_window+1):-1]
-                            volatility = np.std(returns)
-                        else:
-                            volatility = 0
+                # Check if KELP price is above or below the thresholds to decide on buying/selling
+                if mid_price <= lower_threshold and position + max_pos <= max_pos:
+                    volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
+                    if volume > 0:
+                        orders.append(Order("KELP", best_ask, volume))
+                elif mid_price >= upper_threshold and position - max_pos >= -max_pos:
+                    volume = min(order_depth.buy_orders[best_bid], position + max_pos)
+                    if volume > 0:
+                        orders.append(Order("KELP", best_bid, -volume))
 
-                        # Trading logic
-                        ema_diff = abs(ema_short - ema_long)
-                        buy_signal = (ema_short > ema_long and 
-                                      momentum > 0 and 
-                                      volatility < volatility_threshold and 
-                                      ema_diff > trend_threshold)
-                        sell_signal = (ema_short < ema_long and 
-                                       momentum < 0 and 
-                                       volatility < volatility_threshold and 
-                                       ema_diff > trend_threshold)
-
-                        if buy_signal:
-                            available_volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
-                            if available_volume > 0:
-                                orders.append(Order(product, best_ask, available_volume))
-
-                        if sell_signal:
-                            available_volume = min(order_depth.buy_orders[best_bid], position + max_pos)
-                            if available_volume > 0:
-                                orders.append(Order(product, best_bid, -available_volume))
-                else:
-                    print(f"KELP: Price {mid_price} is outside the allowed range.")
-
-            # Logic for SQUID_INK
             elif product == "SQUID_INK":
-                if squid_ink_price_range[0] <= mid_price <= squid_ink_price_range[1]:
-                    if len(prices) >= long_span:
-                        prices_np = np.array(prices)
+                # Calculate the mean and standard deviation of the price history for SQUID_INK
+                mean_price = np.mean(prices)
+                std_dev = np.std(prices)
 
-                        # Calculate short-term and long-term EMAs
-                        ema_short = compute_ema(prices_np[-short_span:], short_span)
-                        ema_long = compute_ema(prices_np[-long_span:], long_span)
-                        momentum = (prices_np[-1] - prices_np[-2]) / prices_np[-2]
+                # Calculate upper and lower price thresholds (±1 standard deviation)
+                upper_threshold = mean_price + std_dev
+                lower_threshold = mean_price - std_dev
 
-                        # Calculate volatility
-                        if len(prices_np) >= vol_window + 1:
-                            returns = np.diff(prices_np[-(vol_window+1):]) / prices_np[-(vol_window+1):-1]
-                            volatility = np.std(returns)
-                        else:
-                            volatility = 0
+                # Check if SQUID_INK price is above or below the thresholds to decide on buying/selling
+                if mid_price <= lower_threshold and position + max_pos <= max_pos:
+                    volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
+                    if volume > 0:
+                        orders.append(Order("SQUID_INK", best_ask, volume))
+                elif mid_price >= upper_threshold and position - max_pos >= -max_pos:
+                    volume = min(order_depth.buy_orders[best_bid], position + max_pos)
+                    if volume > 0:
+                        orders.append(Order("SQUID_INK", best_bid, -volume))
 
-                        # Trading logic
-                        ema_diff = abs(ema_short - ema_long)
-                        buy_signal = (ema_short > ema_long and 
-                                      momentum > 0 and 
-                                      volatility < volatility_threshold and 
-                                      ema_diff > trend_threshold)
-                        sell_signal = (ema_short < ema_long and 
-                                       momentum < 0 and 
-                                       volatility < volatility_threshold and 
-                                       ema_diff > trend_threshold)
-
-                        if buy_signal:
-                            available_volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
-                            if available_volume > 0:
-                                orders.append(Order(product, best_ask, available_volume))
-
-                        if sell_signal:
-                            available_volume = min(order_depth.buy_orders[best_bid], position + max_pos)
-                            if available_volume > 0:
-                                orders.append(Order(product, best_bid, -available_volume))
-                else:
-                    print(f"SQUID_INK: Price {mid_price} is outside the allowed range.")
-            
             result_orders[product] = orders
 
         return result_orders, 1, json.dumps(trader_data)
