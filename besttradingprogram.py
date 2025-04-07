@@ -1,15 +1,14 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List, Dict
 import json
-import random
 
 class Trader:
 
     def __init__(self):
-        self.max_position = 50
+        self.max_position = 100  # Increased max position size to allow for more aggressive trading
         self.smoothing = 0.5  # EMA smoothing factor
-        self.stop_loss_percentage = 0.05  # Stop loss at 5% loss
-        self.take_profit_percentage = 0.10  # Take profit at 10% profit
+        self.stop_loss_percentage = 0.10  # Increased stop loss to 10% to allow larger price fluctuations
+        self.take_profit_percentage = 0.15  # Increased take profit to 15% for larger profit targets
 
     def run(self, state: TradingState):
         print("traderData: " + state.traderData)
@@ -38,9 +37,9 @@ class Trader:
 
         print(f"Total Capital: {total_capital}")
 
-        # Capital protection: Stop trading if capital exceeds the stop threshold
-        if total_capital > 200:
-            print("Capital exceeds 200, closing all positions and stopping trading.")
+        # Capital protection: Stop trading if capital exceeds the stop threshold of 400
+        if total_capital > 400:
+            print("Capital exceeds 400, closing all positions and stopping trading.")
             
             # Close all positions (i.e., sell if we have a long position, buy if we have a short position)
             for product, position in state.position.items():
@@ -125,12 +124,6 @@ class Trader:
                     orders.append(Order(product, best_ask, abs(position)))
 
             result[product] = orders
-
-        # Save EMA values as traderData
-        traderData = json.dumps(ema_memory)
-        conversions = 1
-        return result, conversions, traderData
-
 
         # Save EMA values as traderData
         traderData = json.dumps(ema_memory)
