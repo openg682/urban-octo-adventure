@@ -11,6 +11,9 @@ class ResinStrategy:
         self.trade_volume = 30
         self.trigger_threshold = 2
         self.volatility_window = 20  # Look-back window for volatility calculation
+        self.entry_price = None  # To store the entry price for stop-loss and take-profit
+        self.stop_loss_pct = 0.02  # 2% stop-loss
+        self.take_profit_pct = 0.05  # 5% take-profit
 
     def update(self, mid_price):
         self.history.append(mid_price)
@@ -31,18 +34,38 @@ class ResinStrategy:
         # Dynamic position sizing based on volatility
         dynamic_position = min(self.trade_volume, int(self.pos_limit / (std_dev + 1e-6)))  # Prevent division by zero
 
+        # Set stop loss and take profit orders based on entry price
         orders = []
-        if deviation <= -self.trigger_threshold and current_position + dynamic_position <= self.pos_limit:
-            best_ask = min(order_depth.sell_orders.keys())
-            volume = min(-order_depth.sell_orders[best_ask], self.pos_limit - current_position, dynamic_position)
-            if volume > 0:
-                orders.append(Order("RAINFOREST_RESIN", best_ask, volume))
 
-        if deviation >= self.trigger_threshold and current_position - dynamic_position >= -self.pos_limit:
-            best_bid = max(order_depth.buy_orders.keys())
-            volume = min(order_depth.buy_orders[best_bid], current_position + self.pos_limit, dynamic_position)
-            if volume > 0:
-                orders.append(Order("RAINFOREST_RESIN", best_bid, -volume))
+        # If we already have an entry price, let's check stop loss or take profit
+        if self.entry_price is not None:
+            if current_position > 0:  # Long position
+                if current_price <= self.entry_price * (1 - self.stop_loss_pct):  # Trigger stop loss
+                    orders.append(Order("RAINFOREST_RESIN", current_price, -current_position))
+                elif current_price >= self.entry_price * (1 + self.take_profit_pct):  # Trigger take profit
+                    orders.append(Order("RAINFOREST_RESIN", current_price, -current_position))
+
+            elif current_position < 0:  # Short position
+                if current_price >= self.entry_price * (1 + self.stop_loss_pct):  # Trigger stop loss
+                    orders.append(Order("RAINFOREST_RESIN", current_price, -current_position))
+                elif current_price <= self.entry_price * (1 - self.take_profit_pct):  # Trigger take profit
+                    orders.append(Order("RAINFOREST_RESIN", current_price, -current_position))
+
+        # If no position, we follow the strategy to enter a new position
+        if self.entry_price is None:
+            if deviation <= -self.trigger_threshold and current_position + dynamic_position <= self.pos_limit:
+                best_ask = min(order_depth.sell_orders.keys())
+                volume = min(-order_depth.sell_orders[best_ask], self.pos_limit - current_position, dynamic_position)
+                if volume > 0:
+                    orders.append(Order("RAINFOREST_RESIN", best_ask, volume))
+                    self.entry_price = best_ask  # Set entry price for stop loss and take profit
+
+            elif deviation >= self.trigger_threshold and current_position - dynamic_position >= -self.pos_limit:
+                best_bid = max(order_depth.buy_orders.keys())
+                volume = min(order_depth.buy_orders[best_bid], current_position + self.pos_limit, dynamic_position)
+                if volume > 0:
+                    orders.append(Order("RAINFOREST_RESIN", best_bid, -volume))
+                    self.entry_price = best_bid  # Set entry price for stop loss and take profit
 
         return orders
 
