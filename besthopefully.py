@@ -21,7 +21,7 @@ PARAMS = {
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 20,
+        "take_width": 15,
         "clear_width": 5,
         "disregard_edge": 30,
         "join_edge": 10,
@@ -30,7 +30,7 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 40,
+        "take_width": 50,
         "clear_width": 20,
         "disregard_edge": 150,
         "join_edge": 20,
@@ -43,10 +43,16 @@ class Trader:
     def __init__(self):
         self.params = PARAMS
         self.LIMIT = {p: 50 for p in PARAMS}
+        self.max_drawdown = -500  # Maximum drawdown limit for stop trading
+        self.capital_stop_limit = 500  # Capital stop limit to stop trading
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
         buy_volume = sell_volume = 0
+
+        # Prevent taking too large positions
+        if abs(position) >= position_limit:
+            return 0, 0
 
         # Take best ask if it's lower than fair value - width
         if order_depth.sell_orders:
@@ -132,8 +138,8 @@ class Trader:
         traderObject = jsonpickle.decode(state.traderData) if state.traderData else {}
         capital = traderObject.get("capital", 0)
 
-        # Stop trading once capital reaches 1000
-        stop_trading = capital >= 600
+        # Stop trading once capital reaches 500 or drops below max drawdown
+        stop_trading = capital >= self.capital_stop_limit or capital <= self.max_drawdown
 
         for product in self.params:
             if product not in state.order_depths:
@@ -158,7 +164,7 @@ class Trader:
                 buy_volume += b
                 sell_volume += s
 
-            # Clear positions when capital reaches 1000
+            # Ensure positions are cleared if stop_trading is activated
             if stop_trading:
                 b, s = self.clear_position(product, p["fair_value"], p["clear_width"], orders, order_depth, position)
                 buy_volume += b
