@@ -21,7 +21,7 @@ PARAMS = {
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 15,
+        "take_width": 20,
         "clear_width": 5,
         "disregard_edge": 30,
         "join_edge": 10,
@@ -30,7 +30,7 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 50,
+        "take_width": 40,
         "clear_width": 20,
         "disregard_edge": 150,
         "join_edge": 20,
