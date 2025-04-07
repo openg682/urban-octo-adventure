@@ -12,8 +12,8 @@ class ResinStrategy:
         self.trigger_threshold = 2
         self.volatility_window = 20  # Look-back window for volatility calculation
         self.entry_price = None  # To store the entry price for stop-loss and take-profit
-        self.stop_loss_pct = 0.01  # 2% stop-loss
-        self.take_profit_pct = 0.03  # 5% take-profit
+        self.stop_loss_pct = 0.02  # 2% stop-loss
+        self.take_profit_pct = 0.05  # 5% take-profit
 
     def update(self, mid_price):
         self.history.append(mid_price)
@@ -93,8 +93,8 @@ class Trader:
 
         resin_strategy = ResinStrategy()
 
-        kelp_price_range = (1990, 2050)
-        squid_ink_price_range = (1800, 2200)
+        kelp_price_range = (2000, 2030)
+        squid_ink_price_range = (1900, 2100)
 
         for product in all_products:
             if product not in trader_data:
