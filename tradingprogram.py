@@ -10,8 +10,8 @@ class Trader:
         short_span = 10
         long_span = 50
         vol_window = 20
-        volatility_threshold = 0.004  # 0.4%
-        trend_threshold = 0.1  # Minimum EMA spread to act
+        volatility_threshold = 0.04  # 0.4%
+        trend_threshold = 0.3  # Minimum EMA spread to act
 
         all_products = ["KELP", "SQUID_INK", "RAINFOREST_RESIN"]
         trader_data = json.loads(state.traderData) if state.traderData else {}
