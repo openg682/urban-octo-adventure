@@ -3,45 +3,47 @@ from typing import Dict, List
 import json
 import numpy as np
 
+# Define ResinStrategy class outside the Trader class
+class ResinStrategy:
+    def __init__(self):
+        self.history = []
+        self.max_len = 10
+        self.pos_limit = 50
+        self.trade_volume = 30
+        self.trigger_threshold = 2
+
+    def update(self, mid_price):
+        self.history.append(mid_price)
+        if len(self.history) > self.max_len:
+            self.history = self.history[-self.max_len:]
+
+    def generate_orders(self, order_depth, current_position):
+        if len(self.history) < self.max_len:
+            return []
+
+        avg_price = sum(self.history) / len(self.history)
+        current_price = (max(order_depth.buy_orders.keys()) + min(order_depth.sell_orders.keys())) / 2
+        deviation = current_price - avg_price
+
+        orders = []
+        # Go long if price is under mean by at least 2
+        if deviation <= -self.trigger_threshold and current_position + self.trade_volume <= self.pos_limit:
+            best_ask = min(order_depth.sell_orders.keys())
+            volume = min(-order_depth.sell_orders[best_ask], self.pos_limit - current_position, self.trade_volume)
+            if volume > 0:
+                orders.append(Order("RAINFOREST_RESIN", best_ask, volume))
+
+        # Go short if price is above mean by at least 2
+        if deviation >= self.trigger_threshold and current_position - self.trade_volume >= -self.pos_limit:
+            best_bid = max(order_depth.buy_orders.keys())
+            volume = min(order_depth.buy_orders[best_bid], current_position + self.pos_limit, self.trade_volume)
+            if volume > 0:
+                orders.append(Order("RAINFOREST_RESIN", best_bid, -volume))
+
+        return orders
+
+
 class Trader:
-    class ResinStrategy:
-        def __init__(self):
-            self.history = []
-            self.max_len = 10
-            self.pos_limit = 50
-            self.trade_volume = 30
-            self.trigger_threshold = 2
-
-        def update(self, mid_price):
-            self.history.append(mid_price)
-            if len(self.history) > self.max_len:
-                self.history = self.history[-self.max_len:]
-
-        def generate_orders(self, order_depth, current_position):
-            if len(self.history) < self.max_len:
-                return []
-
-            avg_price = sum(self.history) / len(self.history)
-            current_price = (max(order_depth.buy_orders.keys()) + min(order_depth.sell_orders.keys())) / 2
-            deviation = current_price - avg_price
-
-            orders = []
-            # Go long if price is under mean by at least 2
-            if deviation <= -self.trigger_threshold and current_position + self.trade_volume <= self.pos_limit:
-                best_ask = min(order_depth.sell_orders.keys())
-                volume = min(-order_depth.sell_orders[best_ask], self.pos_limit - current_position, self.trade_volume)
-                if volume > 0:
-                    orders.append(Order("RAINFOREST_RESIN", best_ask, volume))
-
-            # Go short if price is above mean by at least 2
-            if deviation >= self.trigger_threshold and current_position - self.trade_volume >= -self.pos_limit:
-                best_bid = max(order_depth.buy_orders.keys())
-                volume = min(order_depth.buy_orders[best_bid], current_position + self.pos_limit, self.trade_volume)
-                if volume > 0:
-                    orders.append(Order("RAINFOREST_RESIN", best_bid, -volume))
-
-            return orders
-
     def run(self, state: TradingState):
         # Configurations
         max_pos = 50
