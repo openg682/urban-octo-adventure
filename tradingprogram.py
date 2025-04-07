@@ -41,7 +41,7 @@ class Trader:
                     orders.append(Order("RAINFOREST_RESIN", best_bid, -volume))
 
             return orders
-        
+
     def run(self, state: TradingState):
         # Configurations
         max_pos = 50
@@ -66,11 +66,11 @@ class Trader:
             return ema
 
         # Initialize ResinStrategy
-        resin_strategy = ResinStrategy()
+        resin_strategy = self.ResinStrategy()
 
-        # Define price ranges for KELP and SQUID_INK (Widened for debugging)
-        kelp_price_range = (1990, 2050)  # KELP should stay between 2015 ± 15 (Widened for debugging)
-        squid_ink_price_range = (1800, 2200)  # SQUID_INK should stay between 2000 ± 100 (Widened for debugging)
+        # Define price ranges for KELP and SQUID_INK
+        kelp_price_range = (1990, 2050)  # KELP should stay between 2015 ± 15
+        squid_ink_price_range = (1800, 2200)  # SQUID_INK should stay between 2000 ± 100
 
         # Iterate over each product and execute trading logic
         for product in all_products:
@@ -105,11 +105,9 @@ class Trader:
                 resin_strategy.update(mid_price)
                 orders.extend(resin_strategy.generate_orders(order_depth, position))
 
-            # Logic for KELP and SQUID_INK
+            # Logic for KELP
             elif product == "KELP":
-                # Check if KELP price is within the allowed range (Widened range for debugging)
                 if kelp_price_range[0] <= mid_price <= kelp_price_range[1]:
-                    print(f"KELP: Price {mid_price} is within the range.")
                     if len(prices) >= long_span:
                         prices_np = np.array(prices)
 
@@ -125,7 +123,7 @@ class Trader:
                         else:
                             volatility = 0
 
-                        # Trading logic: calculate the EMA
+                        # Trading logic
                         ema_diff = abs(ema_short - ema_long)
                         buy_signal = (ema_short > ema_long and 
                                       momentum > 0 and 
@@ -145,14 +143,12 @@ class Trader:
                             available_volume = min(order_depth.buy_orders[best_bid], position + max_pos)
                             if available_volume > 0:
                                 orders.append(Order(product, best_bid, -available_volume))
-
                 else:
                     print(f"KELP: Price {mid_price} is outside the allowed range.")
-                
+
+            # Logic for SQUID_INK
             elif product == "SQUID_INK":
-                # Check if SQUID_INK price is within the allowed range (Widened range for debugging)
                 if squid_ink_price_range[0] <= mid_price <= squid_ink_price_range[1]:
-                    print(f"SQUID_INK: Price {mid_price} is within the range.")
                     if len(prices) >= long_span:
                         prices_np = np.array(prices)
 
@@ -168,7 +164,7 @@ class Trader:
                         else:
                             volatility = 0
 
-                        # Trading logic: calculate the EMA
+                        # Trading logic
                         ema_diff = abs(ema_short - ema_long)
                         buy_signal = (ema_short > ema_long and 
                                       momentum > 0 and 
@@ -188,7 +184,6 @@ class Trader:
                             available_volume = min(order_depth.buy_orders[best_bid], position + max_pos)
                             if available_volume > 0:
                                 orders.append(Order(product, best_bid, -available_volume))
-
                 else:
                     print(f"SQUID_INK: Price {mid_price} is outside the allowed range.")
             
