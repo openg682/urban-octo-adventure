@@ -1,73 +1,91 @@
 from datamodel import OrderDepth, TradingState, Order
-from typing import List
+from typing import Dict, List
 import json
 import numpy as np
 
 class Trader:
     def run(self, state: TradingState):
-        product = "KELP"
+        # Configurations
         max_pos = 50
         short_span = 10
         long_span = 50
         vol_window = 20
-        volatility_threshold = 0.004  # 0.4% std dev
+        volatility_threshold = 0.004  # 0.4%
+        trend_threshold = 0.1  # Minimum EMA spread to act
 
-        order_depth = state.order_depths[product]
-        if not order_depth.buy_orders or not order_depth.sell_orders:
-            return {}, 1, state.traderData
+        all_products = ["KELP", "SQUID_INK", "RAINFOREST_RESIN"]
+        trader_data = json.loads(state.traderData) if state.traderData else {}
 
-        best_bid = max(order_depth.buy_orders.keys())
-        best_ask = min(order_depth.sell_orders.keys())
-        mid_price = (best_bid + best_ask) / 2
+        result_orders = {}
 
-        # Load state (price history)
-        history = json.loads(state.traderData) if state.traderData else {"prices": []}
-        prices = history.get("prices", [])
-        prices.append(mid_price)
+        for product in all_products:
+            # Initialize history if needed
+            if product not in trader_data:
+                trader_data[product] = {"prices": []}
 
-        # Keep only needed history
-        max_len = max(long_span, vol_window) + 5
-        if len(prices) > max_len:
-            prices = prices[-max_len:]
+            orders = []
+            order_depth: OrderDepth = state.order_depths.get(product, None)
+            if not order_depth or not order_depth.buy_orders or not order_depth.sell_orders:
+                result_orders[product] = []
+                continue
 
-        orders = []
-        position = state.position.get(product, 0)
+            best_bid = max(order_depth.buy_orders.keys())
+            best_ask = min(order_depth.sell_orders.keys())
+            mid_price = (best_bid + best_ask) / 2
 
-        if len(prices) >= long_span:
-            prices_np = np.array(prices)
+            # Append to price history
+            prices = trader_data[product]["prices"]
+            prices.append(mid_price)
 
-            # Calculate EMAs manually
-            def compute_ema(series, span):
-                alpha = 2 / (span + 1)
-                ema = series[0]
-                for price in series[1:]:
-                    ema = alpha * price + (1 - alpha) * ema
-                return ema
+            max_len = max(long_span, vol_window) + 5
+            if len(prices) > max_len:
+                prices = prices[-max_len:]
+            trader_data[product]["prices"] = prices
 
-            ema_short = compute_ema(prices_np[-short_span:], short_span)
-            ema_long = compute_ema(prices_np[-long_span:], long_span)
-            momentum = (prices_np[-1] - prices_np[-2]) / prices_np[-2]
+            position = state.position.get(product, 0)
 
-            if len(prices_np) >= vol_window + 1:
-                returns = np.diff(prices_np[-(vol_window+1):]) / prices_np[-(vol_window+1):-1]
-                volatility = np.std(returns)
-            else:
-                volatility = 0
+            if len(prices) >= long_span:
+                prices_np = np.array(prices)
 
-            # Trading logic
-            buy_signal = ema_short > ema_long and momentum > 0 and volatility < volatility_threshold
-            sell_signal = ema_short < ema_long and momentum < 0 and volatility < volatility_threshold
+                # EMA calculation
+                def compute_ema(series, span):
+                    alpha = 2 / (span + 1)
+                    ema = series[0]
+                    for price in series[1:]:
+                        ema = alpha * price + (1 - alpha) * ema
+                    return ema
 
-            if buy_signal:
-                volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
-                if volume > 0:
-                    orders.append(Order(product, best_ask, volume))
+                ema_short = compute_ema(prices_np[-short_span:], short_span)
+                ema_long = compute_ema(prices_np[-long_span:], long_span)
+                momentum = (prices_np[-1] - prices_np[-2]) / prices_np[-2]
 
-            if sell_signal:
-                volume = min(order_depth.buy_orders[best_bid], position + max_pos)
-                if volume > 0:
-                    orders.append(Order(product, best_bid, -volume))
+                if len(prices_np) >= vol_window + 1:
+                    returns = np.diff(prices_np[-(vol_window+1):]) / prices_np[-(vol_window+1):-1]
+                    volatility = np.std(returns)
+                else:
+                    volatility = 0
 
-        # Save updated history
-        traderData = json.dumps({"prices": prices})
-        return {product: orders}, 1, traderData
+                # Trading logic
+                ema_diff = abs(ema_short - ema_long)
+                buy_signal = (ema_short > ema_long and 
+                              momentum > 0 and 
+                              volatility < volatility_threshold and 
+                              ema_diff > trend_threshold)
+                sell_signal = (ema_short < ema_long and 
+                               momentum < 0 and 
+                               volatility < volatility_threshold and 
+                               ema_diff > trend_threshold)
+
+                if buy_signal:
+                    available_volume = min(-order_depth.sell_orders[best_ask], max_pos - position)
+                    if available_volume > 0:
+                        orders.append(Order(product, best_ask, available_volume))
+
+                if sell_signal:
+                    available_volume = min(order_depth.buy_orders[best_bid], position + max_pos)
+                    if available_volume > 0:
+                        orders.append(Order(product, best_bid, -available_volume))
+
+            result_orders[product] = orders
+
+        return result_orders, 1, json.dumps(trader_data)
