@@ -7,8 +7,8 @@ class Trader:
     def __init__(self):
         self.max_position = 100  # Increased max position size to allow for more aggressive trading
         self.smoothing = 0.5  # EMA smoothing factor
-        self.stop_loss_percentage = 0.10  # Increased stop loss to 10% to allow larger price fluctuations
-        self.take_profit_percentage = 0.15  # Increased take profit to 15% for larger profit targets
+        self.stop_loss_percentage = 0.20  # Increased stop loss to 10% to allow larger price fluctuations
+        self.take_profit_percentage = 0.30  # Increased take profit to 15% for larger profit targets
 
     def run(self, state: TradingState):
         print("traderData: " + state.traderData)
