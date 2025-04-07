@@ -37,8 +37,29 @@ class Trader:
 
         # Stop trading if the capital exceeds 200
         if total_capital > 200:
-            print("Capital exceeds 200, stopping trading.")
-            return result, 1, state.traderData  # Return empty orders to stop further trading
+            print("Capital exceeds 200, closing all positions and stopping trading.")
+            
+            # Close all positions (i.e., sell if we have a long position, buy if we have a short position)
+            for product, position in state.position.items():
+                order_depth: OrderDepth = state.order_depths.get(product, None)
+                if order_depth:
+                    if position > 0:
+                        # Close long position by selling at the best ask price
+                        best_ask = min(order_depth.sell_orders.keys())
+                        orders = [Order(product, best_ask, -position)]  # Sell all of our position
+                        print(f"CLOSING LONG: SELL {position} @ {best_ask}")
+                    elif position < 0:
+                        # Close short position by buying at the best bid price
+                        best_bid = max(order_depth.buy_orders.keys())
+                        orders = [Order(product, best_bid, -position)]  # Buy back all of our position
+                        print(f"CLOSING SHORT: BUY {position} @ {best_bid}")
+                    else:
+                        orders = []
+
+                    # Add orders to result
+                    result[product] = orders
+
+            return result, 1, state.traderData  # Return the orders to close positions
 
         # Proceed with trading if capital is less than or equal to 200
         for product in state.order_depths:
