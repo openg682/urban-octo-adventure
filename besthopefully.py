@@ -131,7 +131,9 @@ class Trader:
         result = {}
         traderObject = jsonpickle.decode(state.traderData) if state.traderData else {}
         capital = traderObject.get("capital", 0)
-        stop_trading = capital >= 200
+
+        # Stop trading once capital reaches 1000
+        stop_trading = capital >= 1000
 
         for product in self.params:
             if product not in state.order_depths:
@@ -156,12 +158,15 @@ class Trader:
                 buy_volume += b
                 sell_volume += s
 
-            b, s = self.clear_position(product, p["fair_value"], p["clear_width"], orders, order_depth, position)
-            buy_volume += b
-            sell_volume += s
+            # Clear positions when capital reaches 1000
+            if stop_trading:
+                b, s = self.clear_position(product, p["fair_value"], p["clear_width"], orders, order_depth, position)
+                buy_volume += b
+                sell_volume += s
 
             result[product] = orders
 
+        # Update capital (you can replace this with actual PnL calculation logic)
         capital += 10  # Simulated for testing; replace with actual PnL logic
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
