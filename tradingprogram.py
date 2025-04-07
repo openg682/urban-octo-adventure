@@ -2,7 +2,7 @@ from datamodel import OrderDepth, TradingState, Order
 from typing import List
 import jsonpickle
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import statistics
 
 class Product:
     RAINBOW_RESIN = "RAINBOW_RESIN"
@@ -50,17 +50,27 @@ class Trader:
         self.ema_period = 50  # Period for EMA
 
     def linear_regression(self, prices):
-        """Calculate the slope of the price using Linear Regression."""
-        if len(prices) < 2:
+        """Calculate the slope of the price using Linear Regression (manual implementation)."""
+        n = len(prices)
+        if n < 2:
             return 0  # Not enough data to perform regression
-        
-        # Reshape the data for LinearRegression
-        X = np.arange(len(prices)).reshape(-1, 1)  # Time steps as X
+
+        x = np.arange(n)  # Time steps as x (0, 1, 2, ...)
         y = np.array(prices)  # Prices as y
 
-        # Fit linear regression model
-        model = LinearRegression().fit(X, y)
-        return model.coef_[0]  # Return the slope (m) of the line
+        # Calculate the sums needed for the formula
+        sum_x = np.sum(x)
+        sum_y = np.sum(y)
+        sum_xx = np.sum(x * x)
+        sum_xy = np.sum(x * y)
+
+        # Calculate the slope (m)
+        numerator = (n * sum_xy) - (sum_x * sum_y)
+        denominator = (n * sum_xx) - (sum_x ** 2)
+        if denominator == 0:
+            return 0  # Avoid division by zero
+        m = numerator / denominator
+        return m  # Return the slope (m)
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
