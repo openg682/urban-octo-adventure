@@ -133,7 +133,7 @@ class Trader:
         capital = traderObject.get("capital", 0)
 
         # Stop trading once capital reaches 1000
-        stop_trading = capital >= 1000
+        stop_trading = capital >= 600
 
         for product in self.params:
             if product not in state.order_depths:
