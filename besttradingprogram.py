@@ -18,6 +18,29 @@ class Trader:
         else:
             ema_memory = {}
 
+        total_capital = 0  # This will store the trader's total capital
+
+        # Compute the trader's total capital from positions
+        for product, position in state.position.items():
+            order_depth: OrderDepth = state.order_depths.get(product, None)
+            if order_depth:
+                best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else 0
+                best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else 0
+                # If we have a position, we calculate its market value
+                if position > 0:
+                    total_capital += best_ask * position  # Long position
+                elif position < 0:
+                    total_capital += best_bid * -position  # Short position
+                # Otherwise, we don't add any capital for this product if there's no position
+
+        print(f"Total Capital: {total_capital}")
+
+        # Stop trading if the capital exceeds 200
+        if total_capital > 200:
+            print("Capital exceeds 200, stopping trading.")
+            return result, 1, state.traderData  # Return empty orders to stop further trading
+
+        # Proceed with trading if capital is less than or equal to 200
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
@@ -64,5 +87,3 @@ class Trader:
         traderData = json.dumps(ema_memory)
         conversions = 1
         return result, conversions, traderData
-
-
