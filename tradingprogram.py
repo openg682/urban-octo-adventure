@@ -45,7 +45,7 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = {p: 50 for p in PARAMS}
         self.max_drawdown = -500
-        self.capital_stop_limit = 1000
+        self.capital_stop_limit = 3000
         self.max_profit_limit = 1000  # Maximum profit limit set to 1200
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10  # window for rolling volatility
