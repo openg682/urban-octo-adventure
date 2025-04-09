@@ -171,10 +171,20 @@ class Trader:
 
                 volatility = np.std(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else 0
                 dynamic_take_width = max(10, volatility * 1.5) if product == Product.KELP else p["take_width"]
+                
+                # Make fair value dynamic for both SQUID_INK and KELP
+                if product == Product.KELP:
+                    dynamic_fair_value = np.mean(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else p["fair_value"]
+                    fair_value = dynamic_fair_value
+                elif product == Product.SQUID_INK:
+                    dynamic_fair_value = np.mean(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else p["fair_value"]
+                    fair_value = dynamic_fair_value
+                else:
+                    fair_value = p["fair_value"]  # For RAINFOREST_RESIN, keep static fair value
+
             else:
                 dynamic_take_width = p["take_width"]
-
-            fair_value = p["fair_value"]
+                fair_value = p["fair_value"]
 
             if not stop_trading:
                 b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
@@ -195,7 +205,7 @@ class Trader:
 
             result[product] = orders
 
-        capital += 1
+        capital += 10
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
         conversions = 1
