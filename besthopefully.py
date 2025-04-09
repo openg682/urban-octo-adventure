@@ -38,7 +38,7 @@ PARAMS = {
         "default_edge": 50,
         "soft_position_limit": 30,
     },
-
+}
 class Trader:
     def __init__(self):
         self.params = PARAMS
