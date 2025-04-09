@@ -20,7 +20,7 @@ PARAMS = {
 class Trader:
     def __init__(self):
         self.price_history_limit = 50
-        self.capital_stop_limit = 1000  # Can be made dynamic later
+        self.capital_stop_limit = 30000  # Can be made dynamic later
 
     def linear_regression(self, y: List[float]) -> float:
         """Simple linear regression slope of price history"""
