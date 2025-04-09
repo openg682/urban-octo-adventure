@@ -169,13 +169,14 @@ class Trader:
         profit = current_capital - self.initial_capital
         traderObject["capital"] = current_capital
 
+        """
         # --- Stop Trading Check ---
         stop_trading = current_capital >= self.capital_stop_limit \
                        or current_capital <= self.max_drawdown \
                        or (self.initial_capital is not None and profit >= self.max_profit_limit)
 
         print(f"Timestamp: {state.timestamp}, Profit: {profit:.2f}, Capital: {current_capital:.2f}, Stop Trading: {stop_trading}")
-
+        """
         # --- Main Trading Logic Loop ---
         for product in self.params:
             if product not in state.order_depths:
@@ -210,7 +211,7 @@ class Trader:
                  fair_value = np.mean(self.mid_price_history[product])
                  print(f"{product} - Thin book, using historical Fair Value: {fair_value:.2f}")
 
-
+            """
             # --- Stop Trading Logic ---
             if stop_trading:
                 if position != 0:
@@ -227,7 +228,7 @@ class Trader:
                     print(f"STOP TRADING TRIGGERED: No position for {product}")
                 result[product] = orders
                 continue # Skip normal trading logic for this product
-
+             """
             # --- Product-Specific Trading Logic ---
 
             # ** SQUID_INK Mean Reversion Strategy **
