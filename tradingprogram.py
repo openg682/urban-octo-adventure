@@ -22,7 +22,7 @@ PARAMS = {
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 5,  # initial value, will be adjusted dynamically
+        "take_width": 5,
         "clear_width": 5,
         "disregard_edge": 10,
         "join_edge": 1,
@@ -31,7 +31,7 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 5,  # initial value, will be adjusted dynamically
+        "take_width": 5,
         "clear_width": 20,
         "disregard_edge": 10,
         "join_edge": 1,
@@ -170,12 +170,7 @@ class Trader:
                     self.mid_price_history[product].pop(0)
 
                 volatility = np.std(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else 0
-                
-                # More aggressive dynamic take_width for Kelp and Squid Ink based on volatility
-                if product == Product.KELP or product == Product.SQUID_INK:
-                    dynamic_take_width = max(10, volatility * 2.5)  # Increased factor to make the strategy more aggressive
-                else:
-                    dynamic_take_width = p["take_width"]
+                dynamic_take_width = max(10, volatility * 3) if product == Product.KELP or product == Product.SQUID_INK else p["take_width"]
                 
                 # Make fair value dynamic for both SQUID_INK and KELP
                 if product == Product.KELP:
