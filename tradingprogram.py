@@ -13,30 +13,33 @@ class Product:
 PARAMS = {
     Product.RAINFOREST_RESIN: {
         "fair_value": 10000,
-        "take_width": 0.001,
-        "clear_width": 0.5,
-        "disregard_edge": 0.01,
-        "join_edge": 0.001,
-        "default_edge": 0.001,
-        "soft_position_limit": 50,
+        "take_width": 0.01,  # More aggressive (smaller take width)
+        "clear_width": 0.3,   # More aggressive (smaller clear width)
+        "disregard_edge": 0.05,  # More aggressive (lower disregard edge)
+        "join_edge": 0.005,      # More aggressive (smaller join edge)
+        "default_edge": 0.005,   # More aggressive (lower default edge)
+        "soft_position_limit": 60,  # Slightly higher position limit
+        "max_loss_limit": 3000  # Max loss for this product
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 15,
-        "clear_width": 5,
-        "disregard_edge": 25,
-        "join_edge": 10,
-        "default_edge": 15,
-        "soft_position_limit": 40,
+        "take_width": 10,  # More aggressive (lower take width)
+        "clear_width": 4,   # More aggressive (lower clear width)
+        "disregard_edge": 10,  # More aggressive (lower disregard edge)
+        "join_edge": 5,     # More aggressive (smaller join edge)
+        "default_edge": 5,  # More aggressive (lower default edge)
+        "soft_position_limit": 60,  # Higher position limit
+        "max_loss_limit": 1500  # Max loss for Kelp
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 25,
-        "clear_width": 20,
-        "disregard_edge": 100,
-        "join_edge": 20,
-        "default_edge": 35,
-        "soft_position_limit": 45,
+        "take_width": 15,  # More aggressive (lower take width)
+        "clear_width": 15,   # More aggressive (lower clear width)
+        "disregard_edge": 50,  # More aggressive (lower disregard edge)
+        "join_edge": 10,     # More aggressive (smaller join edge)
+        "default_edge": 15,  # More aggressive (lower default edge)
+        "soft_position_limit": 70,  # Higher position limit
+        "max_loss_limit": 2000  # Max loss for Squid Ink
     },
 }
 
@@ -162,6 +165,11 @@ class Trader:
             p = self.params[product]
 
             buy_volume = sell_volume = 0
+
+            # Check stop-loss for this product
+            product_value = (max(order_depth.buy_orders) + min(order_depth.sell_orders)) / 2 * position
+            if product_value < -p["max_loss_limit"]:  # If the current loss exceeds max_loss_limit
+                stop_trading = True  # Stop trading for this product and clear position
 
             if order_depth.buy_orders and order_depth.sell_orders:
                 mid_price = (max(order_depth.buy_orders) + min(order_depth.sell_orders)) / 2
