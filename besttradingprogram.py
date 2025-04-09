@@ -4,12 +4,12 @@ import jsonpickle
 import numpy as np
 
 class Product:
-    RAINBOW_RESIN = "RAINBOW_RESIN"
+    RAINFOREST_RESIN = "RAINFOREST_RESIN"
     KELP = "KELP"
     SQUID_INK = "SQUID_INK"
 
 PARAMS = {
-    Product.RAINBOW_RESIN: {
+    Product.RAINFOREST_RESIN: {
         "fair_value": 10000,
         "spread_trade_volume": 10,
     },
@@ -61,7 +61,7 @@ class Trader:
                 continue  # Skip this product if no market data
 
             # --- Rainbow Resin: Mean-reversion/Spread Capture ---
-            if product == Product.RAINBOW_RESIN:
+            if product == Product.RAINFOREST_RESIN:
                 fair = PARAMS[product]["fair_value"]
                 spread_trade_volume = PARAMS[product]["spread_trade_volume"]
 
