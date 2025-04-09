@@ -35,11 +35,11 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968, # Will be updated dynamically (mean)
-        "volatility_window": 10, # Window for mean/std dev calculation
-        "deviation_entry_threshold": 1.75, # Z-score threshold to enter a position (tune this)
-        "deviation_exit_threshold": 0.45,  # Z-score threshold to exit a position (tune this)
+        "volatility_window": 20, # Window for mean/std dev calculation
+        "deviation_entry_threshold": 2, # Z-score threshold to enter a position (tune this)
+        "deviation_exit_threshold": 0.5,  # Z-score threshold to exit a position (tune this)
         "soft_position_limit": 30, # Still useful for scaling orders potentially
-        "clear_width": 20, # Used for emergency clearing
+        "clear_width": 50, # Used for emergency clearing
     },
 }
 
@@ -169,14 +169,14 @@ class Trader:
         profit = current_capital - self.initial_capital
         traderObject["capital"] = current_capital
 
-        """
+        
         # --- Stop Trading Check ---
         stop_trading = current_capital >= self.capital_stop_limit \
                        or current_capital <= self.max_drawdown \
                        or (self.initial_capital is not None and profit >= self.max_profit_limit)
 
         print(f"Timestamp: {state.timestamp}, Profit: {profit:.2f}, Capital: {current_capital:.2f}, Stop Trading: {stop_trading}")
-        """
+        
         # --- Main Trading Logic Loop ---
         for product in self.params:
             if product not in state.order_depths:
@@ -211,7 +211,7 @@ class Trader:
                  fair_value = np.mean(self.mid_price_history[product])
                  print(f"{product} - Thin book, using historical Fair Value: {fair_value:.2f}")
 
-            """
+            
             # --- Stop Trading Logic ---
             if stop_trading:
                 if position != 0:
@@ -228,7 +228,7 @@ class Trader:
                     print(f"STOP TRADING TRIGGERED: No position for {product}")
                 result[product] = orders
                 continue # Skip normal trading logic for this product
-             """
+             
             # --- Product-Specific Trading Logic ---
 
             # ** SQUID_INK Mean Reversion Strategy **
