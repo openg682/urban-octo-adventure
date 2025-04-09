@@ -24,7 +24,7 @@ PARAMS = {
         "fair_value": 2030,
         "take_width": 15,  # This will be updated dynamically
         "clear_width": 5,
-        "disregard_edge": 30,
+        "disregard_edge": 25,
         "join_edge": 10,
         "default_edge": 20,
         "soft_position_limit": 30,
@@ -33,7 +33,7 @@ PARAMS = {
         "fair_value": 1968,
         "take_width": 50,
         "clear_width": 20,
-        "disregard_edge": 150,
+        "disregard_edge": 100,
         "join_edge": 20,
         "default_edge": 50,
         "soft_position_limit": 30,
@@ -49,7 +49,7 @@ class Trader:
         self.max_profit_limit = 1200  # Maximum profit limit set to 1200
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10  # window for rolling volatility
-        self.min_spread = 3  # minimum spread required to market make
+        self.min_spread = 1  # minimum spread required to market make
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -145,16 +145,9 @@ class Trader:
         capital = traderObject.get("capital", 0)
         initial_capital = traderObject.get("initial_capital", capital)  # Store initial capital
 
-        # Calculate profit/loss
-        profit = capital - initial_capital
-
         # Check if profit limit has been reached
+        profit = capital - initial_capital
         stop_trading = capital >= self.capital_stop_limit or capital <= self.max_drawdown or profit >= self.max_profit_limit
-
-        # Add the condition for stopping trading if P&L exceeds 900
-        if profit >= 900:
-            stop_trading = True
-            print("P&L exceeded 900, stopping and closing all trades.")
 
         for product in self.params:
             if product not in state.order_depths:
@@ -178,7 +171,7 @@ class Trader:
             else:
                 dynamic_take_width = p["take_width"]
 
-            fair_value = mid_price  # Update fair value dynamically based on mid-price
+            fair_value = p["fair_value"]  # Keep static for now
 
             if not stop_trading:
                 b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
