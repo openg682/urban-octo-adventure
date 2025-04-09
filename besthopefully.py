@@ -39,16 +39,105 @@ PARAMS = {
         "soft_position_limit": 30,
     },
 }
+
 class Trader:
     def __init__(self):
         self.params = PARAMS
         self.LIMIT = {p: 50 for p in PARAMS}
         self.max_drawdown = -500
         self.capital_stop_limit = 500
-        self.max_profit_limit = 1200  # Changed the maximum profit limit to 1200
+        self.max_profit_limit = 1200  # Maximum profit limit set to 1200
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10  # window for rolling volatility
         self.min_spread = 3  # minimum spread required to market make
+
+    def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
+        position_limit = self.LIMIT[product]
+        buy_volume = sell_volume = 0
+
+        if abs(position) >= position_limit:
+            return 0, 0
+
+        if order_depth.sell_orders:
+            best_ask = min(order_depth.sell_orders)
+            ask_volume = -order_depth.sell_orders[best_ask]
+            if best_ask <= fair_value - take_width:
+                qty = min(ask_volume, position_limit - position)
+                if qty > 0:
+                    orders.append(Order(product, best_ask, qty))
+                    buy_volume += qty
+
+        if order_depth.buy_orders:
+            best_bid = max(order_depth.buy_orders)
+            bid_volume = order_depth.buy_orders[best_bid]
+            if best_bid >= fair_value + take_width:
+                qty = min(bid_volume, position_limit + position)
+                if qty > 0:
+                    orders.append(Order(product, best_bid, -qty))
+                    sell_volume += qty
+
+        return buy_volume, sell_volume
+
+    def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
+        if order_depth.buy_orders and order_depth.sell_orders:
+            best_bid = max(order_depth.buy_orders)
+            best_ask = min(order_depth.sell_orders)
+            if best_ask - best_bid < self.min_spread:
+                return buy_volume, sell_volume  # skip market making in tight spread
+
+        buy_qty = self.LIMIT[product] - (position + buy_volume)
+        if buy_qty > 0:
+            orders.append(Order(product, bid, buy_qty))
+
+        sell_qty = self.LIMIT[product] + (position - sell_volume)
+        if sell_qty > 0:
+            orders.append(Order(product, ask, -sell_qty))
+
+        return buy_volume, sell_volume
+
+    def clear_position(self, product, fair_value, width, orders, order_depth, position):
+        buy_volume = sell_volume = 0
+        fair_bid = round(fair_value - width)
+        fair_ask = round(fair_value + width)
+
+        if position > 0:
+            clear_qty = sum(vol for price, vol in order_depth.buy_orders.items() if price >= fair_ask)
+            clear_qty = min(clear_qty, position)
+            if clear_qty > 0:
+                orders.append(Order(product, fair_ask, -clear_qty))
+                sell_volume += clear_qty
+
+        elif position < 0:
+            clear_qty = sum(-vol for price, vol in order_depth.sell_orders.items() if price <= fair_bid)
+            clear_qty = min(clear_qty, -position)
+            if clear_qty > 0:
+                orders.append(Order(product, fair_bid, clear_qty))
+                buy_volume += clear_qty
+
+        return buy_volume, sell_volume
+
+    def make_orders(self, product, order_depth, fair_value, position, buy_volume, sell_volume, disregard_edge, join_edge, default_edge, manage_position, soft_position_limit):
+        orders = []
+        asks = [p for p in order_depth.sell_orders if p > fair_value + disregard_edge]
+        bids = [p for p in order_depth.buy_orders if p < fair_value - disregard_edge]
+
+        ask = round(fair_value + default_edge)
+        if asks:
+            best_ask = min(asks)
+            ask = best_ask if abs(best_ask - fair_value) <= join_edge else best_ask - 1
+
+        bid = round(fair_value - default_edge)
+        if bids:
+            best_bid = max(bids)
+            bid = best_bid if abs(fair_value - best_bid) <= join_edge else best_bid + 1
+
+        if manage_position:
+            if position > soft_position_limit:
+                ask -= 1
+            elif position < -soft_position_limit:
+                bid += 1
+
+        return self.market_make(product, orders, bid, ask, position, buy_volume, sell_volume, order_depth)
 
     def run(self, state: TradingState):
         result = {}
