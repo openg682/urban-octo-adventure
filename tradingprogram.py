@@ -13,27 +13,27 @@ class Product:
 PARAMS = {
     Product.RAINFOREST_RESIN: {
         "fair_value": 10000,
-        "take_width": 0.75,
-        "clear_width": 0.5,
-        "disregard_edge": 3,
-        "join_edge": 1,
-        "default_edge": 1,
-        "soft_position_limit": 45,
+        "take_width": 0.01,           # ← More aggressive
+        "clear_width": 0.1,
+        "disregard_edge": 0.5,        # ← Tighter filter
+        "join_edge": 0.1,             # ← Very close join
+        "default_edge": 0.1,          # ← Tight quoting
+        "soft_position_limit": 49     # ← Just under the hard cap
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 6,  # This will be updated dynamically
-        "clear_width": 4,
-        "disregard_edge": 30,
+        "take_width": 10,
+        "clear_width": 5,
+        "disregard_edge": 20,
         "join_edge": 10,
         "default_edge": 15,
         "soft_position_limit": 40,
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 20,
+        "take_width": 25,
         "clear_width": 20,
-        "disregard_edge": 125,
+        "disregard_edge": 60,
         "join_edge": 20,
         "default_edge": 35,
         "soft_position_limit": 45,
@@ -43,13 +43,13 @@ PARAMS = {
 class Trader:
     def __init__(self):
         self.params = PARAMS
-        self.LIMIT = {p: 50 for p in PARAMS}
+        self.LIMIT = {p: 50 for p in PARAMS}  # Constraint: do not change
         self.max_drawdown = -500
         self.capital_stop_limit = 30000
-        self.max_profit_limit = 2500  # Maximum profit limit set to 1200
+        self.max_profit_limit = 2500
         self.mid_price_history = {product: [] for product in PARAMS}
-        self.window = 10  # window for rolling volatility
-        self.min_spread = 1  # minimum spread required to market make
+        self.window = 10
+        self.min_spread = 1
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -83,7 +83,7 @@ class Trader:
             best_bid = max(order_depth.buy_orders)
             best_ask = min(order_depth.sell_orders)
             if best_ask - best_bid < self.min_spread:
-                return buy_volume, sell_volume  # skip market making in tight spread
+                return buy_volume, sell_volume
 
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
@@ -121,12 +121,12 @@ class Trader:
         asks = [p for p in order_depth.sell_orders if p > fair_value + disregard_edge]
         bids = [p for p in order_depth.buy_orders if p < fair_value - disregard_edge]
 
-        ask = round(fair_value + default_edge)
+        ask = round(fair_value + default_edge, 2)
         if asks:
             best_ask = min(asks)
             ask = best_ask if abs(best_ask - fair_value) <= join_edge else best_ask - 1
 
-        bid = round(fair_value - default_edge)
+        bid = round(fair_value - default_edge, 2)
         if bids:
             best_bid = max(bids)
             bid = best_bid if abs(fair_value - best_bid) <= join_edge else best_bid + 1
@@ -143,9 +143,8 @@ class Trader:
         result = {}
         traderObject = jsonpickle.decode(state.traderData) if state.traderData else {}
         capital = traderObject.get("capital", 0)
-        initial_capital = traderObject.get("initial_capital", capital)  # Store initial capital
+        initial_capital = traderObject.get("initial_capital", capital)
 
-        # Check if profit limit has been reached
         profit = capital - initial_capital
         stop_trading = capital >= self.capital_stop_limit or capital <= self.max_drawdown or profit >= self.max_profit_limit
 
@@ -171,7 +170,11 @@ class Trader:
             else:
                 dynamic_take_width = p["take_width"]
 
-            fair_value = p["fair_value"]  # Keep static for now
+            # Use dynamic fair value for KELP
+            if product == Product.KELP and self.mid_price_history[product]:
+                fair_value = np.mean(self.mid_price_history[product])
+            else:
+                fair_value = p["fair_value"]
 
             if not stop_trading:
                 b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
@@ -185,7 +188,6 @@ class Trader:
                 buy_volume += b
                 sell_volume += s
 
-            # If profit limit reached or capital stop limit, close all positions
             if stop_trading:
                 b, s = self.clear_position(product, fair_value, p["clear_width"], orders, order_depth, position)
                 buy_volume += b
@@ -193,7 +195,7 @@ class Trader:
 
             result[product] = orders
 
-        capital += 10  # Increment capital, adjust as needed
+        capital += 10  # Placeholder
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
         conversions = 1
