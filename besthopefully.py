@@ -51,7 +51,7 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = {p: 50 for p in PARAMS} # Position limit per product
         self.max_drawdown = -500
-        self.capital_stop_limit = 500
+        self.capital_stop_limit = 30000
         self.max_profit_limit = 1400
         self.mid_price_history = {product: collections.deque(maxlen=p["volatility_window"]) for product, p in PARAMS.items()}
         self.min_spread = 1 # Used for non-SQUID_INK products
