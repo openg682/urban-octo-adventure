@@ -32,10 +32,10 @@ PARAMS = {
     Product.SQUID_INK: {
         "fair_value": 1968,
         "take_width": 20,
-        "clear_width": 15,
-        "disregard_edge": 90,
+        "clear_width": 20,
+        "disregard_edge": 60,
         "join_edge": 20,
-        "default_edge": 38,
+        "default_edge": 35,
         "soft_position_limit": 45,
     },
 }
