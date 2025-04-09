@@ -5,12 +5,12 @@ import numpy as np
 import statistics
 
 class Product:
-    RAINBOW_RESIN = "RAINBOW_RESIN"
+    RAINFOREST_RESIN = "RAINFOREST_RESIN"
     KELP = "KELP"
     SQUID_INK = "SQUID_INK"
 
 PARAMS = {
-    Product.RAINBOW_RESIN: {
+    Product.RAINFOREST_RESIN: {
         "fair_value": 10000,
         "take_width": 2,
         "clear_width": 0.5,
@@ -178,7 +178,7 @@ class Trader:
 
             buy_volume = sell_volume = 0
 
-            if product == Product.RAINBOW_RESIN:
+            if product == Product.RAINFOREST_RESIN:
                 # Steady mean-reversion strategy for Rainbow Resin
                 fair_value = p["fair_value"]
                 if order_depth.sell_orders:
