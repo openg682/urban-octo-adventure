@@ -3,6 +3,7 @@
 from datamodel import OrderDepth, TradingState, Order
 from typing import List
 import jsonpickle
+import numpy as np
 
 class Product:
     RAINFOREST_RESIN = "RAINFOREST_RESIN"
@@ -21,7 +22,7 @@ PARAMS = {
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 15,
+        "take_width": 15,  # This will be updated dynamically
         "clear_width": 5,
         "disregard_edge": 30,
         "join_edge": 10,
@@ -43,18 +44,19 @@ class Trader:
     def __init__(self):
         self.params = PARAMS
         self.LIMIT = {p: 50 for p in PARAMS}
-        self.max_drawdown = -500  # Maximum drawdown limit for stop trading
-        self.capital_stop_limit = 500  # Capital stop limit to stop trading
+        self.max_drawdown = -500
+        self.capital_stop_limit = 500
+        self.mid_price_history = {product: [] for product in PARAMS}
+        self.window = 10  # window for rolling volatility
+        self.min_spread = 3  # minimum spread required to market make
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
         buy_volume = sell_volume = 0
 
-        # Prevent taking too large positions
         if abs(position) >= position_limit:
             return 0, 0
 
-        # Take best ask if it's lower than fair value - width
         if order_depth.sell_orders:
             best_ask = min(order_depth.sell_orders)
             ask_volume = -order_depth.sell_orders[best_ask]
@@ -64,7 +66,6 @@ class Trader:
                     orders.append(Order(product, best_ask, qty))
                     buy_volume += qty
 
-        # Take best bid if it's higher than fair value + width
         if order_depth.buy_orders:
             best_bid = max(order_depth.buy_orders)
             bid_volume = order_depth.buy_orders[best_bid]
@@ -76,7 +77,13 @@ class Trader:
 
         return buy_volume, sell_volume
 
-    def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume):
+    def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
+        if order_depth.buy_orders and order_depth.sell_orders:
+            best_bid = max(order_depth.buy_orders)
+            best_ask = min(order_depth.sell_orders)
+            if best_ask - best_bid < self.min_spread:
+                return buy_volume, sell_volume  # skip market making in tight spread
+
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, bid, buy_qty))
@@ -93,7 +100,6 @@ class Trader:
         fair_ask = round(fair_value + width)
 
         if position > 0:
-            # Sell to clear position
             clear_qty = sum(vol for price, vol in order_depth.buy_orders.items() if price >= fair_ask)
             clear_qty = min(clear_qty, position)
             if clear_qty > 0:
@@ -101,7 +107,6 @@ class Trader:
                 sell_volume += clear_qty
 
         elif position < 0:
-            # Buy to clear position
             clear_qty = sum(-vol for price, vol in order_depth.sell_orders.items() if price <= fair_bid)
             clear_qty = min(clear_qty, -position)
             if clear_qty > 0:
@@ -131,14 +136,13 @@ class Trader:
             elif position < -soft_position_limit:
                 bid += 1
 
-        return self.market_make(product, orders, bid, ask, position, buy_volume, sell_volume)
+        return self.market_make(product, orders, bid, ask, position, buy_volume, sell_volume, order_depth)
 
     def run(self, state: TradingState):
         result = {}
         traderObject = jsonpickle.decode(state.traderData) if state.traderData else {}
         capital = traderObject.get("capital", 0)
 
-        # Stop trading once capital reaches 500 or drops below max drawdown
         stop_trading = capital >= self.capital_stop_limit or capital <= self.max_drawdown
 
         for product in self.params:
@@ -152,28 +156,39 @@ class Trader:
 
             buy_volume = sell_volume = 0
 
+            if order_depth.buy_orders and order_depth.sell_orders:
+                mid_price = (max(order_depth.buy_orders) + min(order_depth.sell_orders)) / 2
+                self.mid_price_history[product].append(mid_price)
+                if len(self.mid_price_history[product]) > self.window:
+                    self.mid_price_history[product].pop(0)
+
+                volatility = np.std(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else 0
+                dynamic_take_width = max(10, volatility * 1.5) if product == Product.KELP else p["take_width"]
+            else:
+                dynamic_take_width = p["take_width"]
+
+            fair_value = p["fair_value"]  # Keep static for now
+
             if not stop_trading:
-                b, s = self.take_best_orders(product, p["fair_value"], p["take_width"], orders, order_depth, position)
+                b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
                 buy_volume += b
                 sell_volume += s
 
                 b, s = self.make_orders(
-                    product, order_depth, p["fair_value"], position, buy_volume, sell_volume,
+                    product, order_depth, fair_value, position, buy_volume, sell_volume,
                     p["disregard_edge"], p["join_edge"], p["default_edge"], True, p["soft_position_limit"]
                 )
                 buy_volume += b
                 sell_volume += s
 
-            # Ensure positions are cleared if stop_trading is activated
             if stop_trading:
-                b, s = self.clear_position(product, p["fair_value"], p["clear_width"], orders, order_depth, position)
+                b, s = self.clear_position(product, fair_value, p["clear_width"], orders, order_depth, position)
                 buy_volume += b
                 sell_volume += s
 
             result[product] = orders
 
-        # Update capital (you can replace this with actual PnL calculation logic)
-        capital += 10  # Simulated for testing; replace with actual PnL logic
+        capital += 10
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
         conversions = 1
