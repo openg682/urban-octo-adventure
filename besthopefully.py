@@ -1,5 +1,3 @@
-# trading_bot.py
-
 from datamodel import OrderDepth, TradingState, Order
 from typing import List
 import jsonpickle
@@ -19,6 +17,7 @@ PARAMS = {
         "join_edge": 1,
         "default_edge": 2,
         "soft_position_limit": 25,
+        "max_spread": 10,  # Maximum allowed spread
     },
     Product.KELP: {
         "fair_value": 2030,
@@ -28,6 +27,7 @@ PARAMS = {
         "join_edge": 10,
         "default_edge": 20,
         "soft_position_limit": 30,
+        "max_spread": 5,  # Maximum allowed spread
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
@@ -37,6 +37,7 @@ PARAMS = {
         "join_edge": 20,
         "default_edge": 50,
         "soft_position_limit": 30,
+        "max_spread": 25,  # Maximum allowed spread
     },
 }
 
@@ -79,11 +80,15 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
+        max_spread = self.params[product]["max_spread"]  # Get the maximum spread for this product
         if order_depth.buy_orders and order_depth.sell_orders:
             best_bid = max(order_depth.buy_orders)
             best_ask = min(order_depth.sell_orders)
-            if best_ask - best_bid < self.min_spread:
-                return buy_volume, sell_volume  # skip market making in tight spread
+            current_spread = best_ask - best_bid
+
+            # Ensure the spread doesn't exceed the max allowed spread
+            if current_spread > max_spread:
+                return buy_volume, sell_volume  # skip market making if the spread is too wide
 
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
@@ -171,7 +176,7 @@ class Trader:
             else:
                 dynamic_take_width = p["take_width"]
 
-            fair_value = p["fair_value"]  # Keep static for now
+            fair_value = mid_price  # Update fair value dynamically based on mid-price
 
             if not stop_trading:
                 b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
