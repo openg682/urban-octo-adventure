@@ -18,16 +18,16 @@ PARAMS = {
         "disregard_edge": 3,
         "join_edge": 1,
         "default_edge": 2,
-        "soft_position_limit": 25,
+        "soft_position_limit": 45,
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 15,  # This will be updated dynamically
-        "clear_width": 5,
-        "disregard_edge": 25,
+        "take_width": 10,  # This will be updated dynamically
+        "clear_width": 4,
+        "disregard_edge": 30,
         "join_edge": 10,
         "default_edge": 20,
-        "soft_position_limit": 30,
+        "soft_position_limit": 40,
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
