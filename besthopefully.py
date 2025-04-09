@@ -5,12 +5,12 @@ from typing import List
 import jsonpickle
 
 class Product:
-    RAINBOW_RESIN = "RAINBOW_RESIN"
+    RAINFOREST_RESIN = "RAINFOREST_RESIN"
     KELP = "KELP"
     SQUID_INK = "SQUID_INK"
 
 PARAMS = {
-    Product.RAINBOW_RESIN: {
+    Product.RAINFOREST_RESIN: {
         "fair_value": 10000,
         "take_width": 2,
         "clear_width": 0.5,
