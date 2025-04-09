@@ -1,131 +1,99 @@
-from datamodel import OrderDepth, UserId, TradingState, Order
+from datamodel import OrderDepth, TradingState, Order
 from typing import List, Dict
-import json
+import jsonpickle
+import numpy as np
+
+class Product:
+    RAINBOW_RESIN = "RAINBOW_RESIN"
+    KELP = "KELP"
+    SQUID_INK = "SQUID_INK"
+
+PARAMS = {
+    Product.RAINBOW_RESIN: {
+        "fair_value": 10000,
+        "spread_trade_volume": 10,
+    },
+    Product.KELP: {},
+    Product.SQUID_INK: {},
+}
 
 class Trader:
-
     def __init__(self):
-        self.max_position = 100  # Increased max position size to allow for more aggressive trading
-        self.smoothing = 0.5  # EMA smoothing factor
-        self.stop_loss_percentage = 0.20  # Increased stop loss to 10% to allow larger price fluctuations
-        self.take_profit_percentage = 0.30  # Increased take profit to 15% for larger profit targets
+        self.price_history_limit = 50
+        self.capital_stop_limit = 1000  # Can be made dynamic later
+
+    def linear_regression(self, y: List[float]) -> float:
+        """Simple linear regression slope of price history"""
+        if len(y) < 2:
+            return 0
+        x = np.arange(len(y))
+        slope, _ = np.polyfit(x, y, 1)
+        return slope
 
     def run(self, state: TradingState):
-        print("traderData: " + state.traderData)
-        print("Observations: " + str(state.observations))
-
         result = {}
-        total_capital = 0  # This will store the trader's total capital
 
-        # Load EMA memory from previous run
-        if state.traderData:
-            ema_memory: Dict[str, float] = json.loads(state.traderData)
-        else:
-            ema_memory = {}
+        # Load or initialize persistent state
+        traderObject = jsonpickle.decode(state.traderData) if state.traderData else {}
+        capital = traderObject.get("capital", 0)
+        if "price_history" not in traderObject:
+            traderObject["price_history"] = {p: [] for p in PARAMS}
 
-        # Compute the trader's total capital from positions
-        for product, position in state.position.items():
-            order_depth: OrderDepth = state.order_depths.get(product, None)
-            if order_depth:
-                best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else 0
-                best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else 0
-                # If we have a position, we calculate its market value
-                if position > 0:
-                    total_capital += best_ask * position  # Long position
-                elif position < 0:
-                    total_capital += best_bid * -position  # Short position
+        price_history = traderObject["price_history"]
 
-        print(f"Total Capital: {total_capital}")
-
-        # Capital protection: Stop trading if capital exceeds the stop threshold of 400
-        if total_capital > 400:
-            print("Capital exceeds 400, closing all positions and stopping trading.")
-            
-            # Close all positions (i.e., sell if we have a long position, buy if we have a short position)
-            for product, position in state.position.items():
-                order_depth: OrderDepth = state.order_depths.get(product, None)
-                if order_depth:
-                    orders = []
-                    if position > 0:
-                        # Close long position by selling at the best ask price
-                        best_ask = min(order_depth.sell_orders.keys())
-                        orders = [Order(product, best_ask, -position)]  # Sell all of our position
-                        print(f"CLOSING LONG: SELL {position} @ {best_ask}")
-                    elif position < 0:
-                        # Close short position by buying at the best bid price
-                        best_bid = max(order_depth.buy_orders.keys())
-                        orders = [Order(product, best_bid, -position)]  # Buy back all of our position
-                        print(f"CLOSING SHORT: BUY {position} @ {best_bid}")
-                    result[product] = orders
-
-            return result, 1, state.traderData  # Return the orders to close positions
-
-        # Now we proceed with trading if capital is within acceptable range
-        for product in state.order_depths:
-            order_depth: OrderDepth = state.order_depths[product]
-            orders: List[Order] = []
-
-            # Get current position
-            position = state.position.get(product, 0)
-
-            # Skip if no market depth
-            if not order_depth.buy_orders or not order_depth.sell_orders:
+        for product in PARAMS:
+            if product not in state.order_depths:
                 continue
 
-            best_bid = max(order_depth.buy_orders.keys())
-            best_ask = min(order_depth.sell_orders.keys())
-            mid_price = (best_bid + best_ask) / 2
+            order_depth: OrderDepth = state.order_depths[product]
+            orders: List[Order] = []
+            position = state.position.get(product, 0)
 
-            # Update EMA (Exponential Moving Average) for fair value
-            if product in ema_memory:
-                ema_price = (self.smoothing * mid_price) + (1 - self.smoothing) * ema_memory[product]
+            # --- Compute mid-price and update history ---
+            if order_depth.sell_orders and order_depth.buy_orders:
+                best_ask = min(order_depth.sell_orders)
+                best_bid = max(order_depth.buy_orders)
+                mid_price = (best_ask + best_bid) / 2
+                price_history[product].append(mid_price)
+                if len(price_history[product]) > self.price_history_limit:
+                    price_history[product].pop(0)
             else:
-                ema_price = mid_price  # initialize EMA with the first price
+                continue  # Skip this product if no market data
 
-            ema_memory[product] = ema_price
-            print(f"{product} EMA fair value: {ema_price}")
+            # --- Rainbow Resin: Mean-reversion/Spread Capture ---
+            if product == Product.RAINBOW_RESIN:
+                fair = PARAMS[product]["fair_value"]
+                spread_trade_volume = PARAMS[product]["spread_trade_volume"]
 
-            # Implement Stop-Loss and Take-Profit based on the entry price
-            entry_price = ema_price  # Using EMA as the entry point
+                if best_ask - best_bid >= 2:
+                    # Buy near bid, sell near ask (inside spread)
+                    orders.append(Order(product, best_bid + 1, spread_trade_volume))
+                    orders.append(Order(product, best_ask - 1, -spread_trade_volume))
 
-            # Implement BUY logic
-            if best_ask < ema_price:
-                buy_volume = min(state.order_depths[product].sell_orders[best_ask], self.max_position - position)
-                if buy_volume > 0:
-                    print(f"BUY {buy_volume} @ {best_ask}")
-                    orders.append(Order(product, best_ask, buy_volume))
+            # --- Kelp & Squid Ink: Trend-based trading with regression ---
+            elif product in [Product.KELP, Product.SQUID_INK]:
+                if len(price_history[product]) >= 10:
+                    slope = self.linear_regression(price_history[product])
 
-            # Implement SELL logic
-            if best_bid > ema_price:
-                sell_volume = min(state.order_depths[product].buy_orders[best_bid], position + self.max_position)
-                if sell_volume > 0:
-                    print(f"SELL {sell_volume} @ {best_bid}")
-                    orders.append(Order(product, best_bid, -sell_volume))
+                    trade_volume = 5
+                    slope_threshold = 0.2  # Can be fine-tuned
 
-            # Implement Stop-Loss and Take-Profit
-            if position > 0:  # If we have a long position
-                stop_loss_price = entry_price * (1 - self.stop_loss_percentage)
-                take_profit_price = entry_price * (1 + self.take_profit_percentage)
-                if best_bid <= stop_loss_price:
-                    print(f"STOP-LOSS: SELL {position} @ {best_bid}")
-                    orders.append(Order(product, best_bid, -position))
-                elif best_bid >= take_profit_price:
-                    print(f"TAKE-PROFIT: SELL {position} @ {best_bid}")
-                    orders.append(Order(product, best_bid, -position))
-
-            elif position < 0:  # If we have a short position
-                stop_loss_price = entry_price * (1 + self.stop_loss_percentage)
-                take_profit_price = entry_price * (1 - self.take_profit_percentage)
-                if best_ask >= stop_loss_price:
-                    print(f"STOP-LOSS: BUY {abs(position)} @ {best_ask}")
-                    orders.append(Order(product, best_ask, abs(position)))
-                elif best_ask <= take_profit_price:
-                    print(f"TAKE-PROFIT: BUY {abs(position)} @ {best_ask}")
-                    orders.append(Order(product, best_ask, abs(position)))
+                    if slope > slope_threshold:
+                        if order_depth.sell_orders:
+                            best_ask = min(order_depth.sell_orders)
+                            orders.append(Order(product, best_ask, trade_volume))  # Long
+                    elif slope < -slope_threshold:
+                        if order_depth.buy_orders:
+                            best_bid = max(order_depth.buy_orders)
+                            orders.append(Order(product, best_bid, -trade_volume))  # Short
 
             result[product] = orders
 
-        # Save EMA values as traderData
-        traderData = json.dumps(ema_memory)
+        # --- Update capital (placeholder logic for testing) ---
+        capital += 5  # This is a stand-in; replace with real PnL calc
+        traderObject["capital"] = capital
+        traderObject["price_history"] = price_history
+        traderData = jsonpickle.encode(traderObject)
+
         conversions = 1
         return result, conversions, traderData
