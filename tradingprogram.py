@@ -31,11 +31,11 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 30,
+        "take_width": 20,
         "clear_width": 20,
-        "disregard_edge": 50,
+        "disregard_edge": 75,
         "join_edge": 20,
-        "default_edge": 30,
+        "default_edge": 40,
         "soft_position_limit": 30,
     },
 }
@@ -46,7 +46,7 @@ class Trader:
         self.LIMIT = {p: 50 for p in PARAMS}
         self.max_drawdown = -500
         self.capital_stop_limit = 30000
-        self.max_profit_limit = 1000  # Maximum profit limit set to 1200
+        self.max_profit_limit = 2000  # Maximum profit limit set to 1200
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10  # window for rolling volatility
         self.min_spread = 1  # minimum spread required to market make
