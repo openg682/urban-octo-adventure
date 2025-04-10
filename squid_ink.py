@@ -23,8 +23,8 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = {p: 45 for p in PARAMS}
         self.mid_price_history = {product: [] for product in PARAMS}
-        self.window = 10
-        self.default_min_spread = 1
+        self.window = 20
+        self.default_min_spread = 1.1
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
