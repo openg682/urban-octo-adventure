@@ -22,20 +22,20 @@ PARAMS = {
     },
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 5,
+        "take_width": 15,
         "clear_width": 5,
-        "disregard_edge": 10,
-        "join_edge": 1,
+        "disregard_edge": 25,
+        "join_edge": 10,
         "default_edge": 15,
         "soft_position_limit": 40,
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 5,
+        "take_width": 25,
         "clear_width": 20,
-        "disregard_edge": 10,
-        "join_edge": 1,
-        "default_edge": 15,
+        "disregard_edge": 100,
+        "join_edge": 20,
+        "default_edge": 35,
         "soft_position_limit": 45,
     },
 }
@@ -170,21 +170,11 @@ class Trader:
                     self.mid_price_history[product].pop(0)
 
                 volatility = np.std(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else 0
-                dynamic_take_width = max(10, volatility * 3) if product == Product.KELP or product == Product.SQUID_INK else p["take_width"]
-                
-                # Make fair value dynamic for both SQUID_INK and KELP
-                if product == Product.KELP:
-                    dynamic_fair_value = np.mean(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else p["fair_value"]
-                    fair_value = dynamic_fair_value
-                elif product == Product.SQUID_INK:
-                    dynamic_fair_value = np.mean(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else p["fair_value"]
-                    fair_value = dynamic_fair_value
-                else:
-                    fair_value = p["fair_value"]  # For RAINFOREST_RESIN, keep static fair value
-
+                dynamic_take_width = max(10, volatility * 1.5) if product == Product.KELP else p["take_width"]
             else:
                 dynamic_take_width = p["take_width"]
-                fair_value = p["fair_value"]
+
+            fair_value = p["fair_value"]
 
             if not stop_trading:
                 b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
@@ -205,7 +195,7 @@ class Trader:
 
             result[product] = orders
 
-        capital += 10
+        capital += 1
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
         conversions = 1
