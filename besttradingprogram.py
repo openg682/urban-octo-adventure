@@ -10,10 +10,10 @@ class Product:
 
 PARAMS = {
     Product.KELP: {
-        "fair_value": 2020,
+        "fair_value": 2015,
         "take_width": 10,
         "clear_width": 10,
-        "disregard_edge": 10,
+        "disregard_edge": 30,
         "join_edge": 5,
         "default_edge": 10,
         "soft_position_limit": 100,
@@ -29,7 +29,7 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 25,
+        "take_width": 20,
         "clear_width": 10,
         "disregard_edge": 60,
         "join_edge": 20,
@@ -44,10 +44,10 @@ class Trader:
         self.LIMIT = {p: 100 for p in PARAMS}
         self.max_drawdown = -500
         self.capital_stop_limit = 30000
-        self.max_profit_limit = 2500
+        self.max_profit_limit = 10000
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10
-        self.default_min_spread = 1.1
+        self.default_min_spread = 0.9
 
     # Kelp Section
     def take_best_orders_kelp(self, fair_value, take_width, orders, order_depth, position):
