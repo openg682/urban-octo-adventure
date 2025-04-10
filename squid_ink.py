@@ -9,21 +9,21 @@ class Product:
 PARAMS = {
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 25,
+        "take_width": 15,  # Decreased the take width for more aggressive trading
         "clear_width": 20,
-        "disregard_edge": 100,
-        "join_edge": 20,
-        "default_edge": 35,
-        "soft_position_limit": 45,
+        "disregard_edge": 80,  # Reduced the disregard edge to increase activity
+        "join_edge": 15,  # Reduced join edge for faster market making
+        "default_edge": 25,  # Adjusted the default edge for more aggressive pricing
+        "soft_position_limit": 75,  # Increased the soft position limit for larger positions
     },
 }
 
 class Trader:
     def __init__(self):
         self.params = PARAMS
-        self.LIMIT = {p: 45 for p in PARAMS}
+        self.LIMIT = {p: 75 for p in PARAMS}  # Increased position limits
         self.mid_price_history = {product: [] for product in PARAMS}
-        self.window = 10  # Number of periods to calculate the moving average and volatility
+        self.window = 5  # Shorter window for faster reactions to price movements
         self.default_min_spread = 1
 
     def calculate_volatility(self, prices):
@@ -39,8 +39,8 @@ class Trader:
         return self.params[Product.SQUID_INK]["fair_value"]
     
     def calculate_dynamic_take_width(self, volatility):
-        """Adjust take width based on volatility."""
-        return max(15, volatility * 2)  # Dynamically adjust take width based on volatility
+        """Adjust take width based on volatility, but more aggressively."""
+        return max(10, volatility * 1.5)  # More aggressive adjustment for volatility
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -70,7 +70,7 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
-        """Market making logic for Squid Ink."""
+        """Market making logic for Squid Ink with increased aggression."""
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, bid, buy_qty))
