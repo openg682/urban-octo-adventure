@@ -23,8 +23,24 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = {p: 45 for p in PARAMS}
         self.mid_price_history = {product: [] for product in PARAMS}
-        self.window = 10
+        self.window = 10  # Number of periods to calculate the moving average and volatility
         self.default_min_spread = 1
+
+    def calculate_volatility(self, prices):
+        """Calculate volatility using standard deviation."""
+        if len(prices) > 1:
+            return np.std(prices)
+        return 0
+
+    def calculate_dynamic_fair_value(self, prices):
+        """Calculate fair value as a moving average."""
+        if len(prices) > 1:
+            return np.mean(prices)
+        return self.params[Product.SQUID_INK]["fair_value"]
+    
+    def calculate_dynamic_take_width(self, volatility):
+        """Adjust take width based on volatility."""
+        return max(15, volatility * 2)  # Dynamically adjust take width based on volatility
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -54,7 +70,7 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
-        # Always market make for SQUID_INK
+        """Market making logic for Squid Ink."""
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, bid, buy_qty))
@@ -99,15 +115,20 @@ class Trader:
 
         buy_volume = sell_volume = 0
 
+        # Record mid price history for volatility calculation
         if order_depth.buy_orders and order_depth.sell_orders:
             mid_price = (max(order_depth.buy_orders) + min(order_depth.sell_orders)) / 2
             self.mid_price_history[product].append(mid_price)
             if len(self.mid_price_history[product]) > self.window:
                 self.mid_price_history[product].pop(0)
 
-        fair_value = p["fair_value"]
+        # Calculate dynamic fair value and volatility
+        fair_value = self.calculate_dynamic_fair_value(self.mid_price_history[product])
+        volatility = self.calculate_volatility(self.mid_price_history[product])
+        take_width = self.calculate_dynamic_take_width(volatility)
 
-        b, s = self.take_best_orders(product, fair_value, p["take_width"], orders, order_depth, position)
+        # Trading logic
+        b, s = self.take_best_orders(product, fair_value, take_width, orders, order_depth, position)
         buy_volume += b
         sell_volume += s
 
@@ -119,7 +140,7 @@ class Trader:
         sell_volume += s
 
         result[product] = orders
-        capital += 1
+        capital += 1  # Simulating capital change
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
 
