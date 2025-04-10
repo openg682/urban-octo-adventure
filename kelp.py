@@ -9,12 +9,12 @@ class Product:
 PARAMS = {
     Product.KELP: {
         "fair_value": 2020,
-        "take_width": 10,
+        "take_width": 5,
         "clear_width": 5,
-        "disregard_edge": 15,
-        "join_edge": 10,
-        "default_edge": 10,
-        "soft_position_limit": 45,
+        "disregard_edge": 20,
+        "join_edge": 15,
+        "default_edge": 15,
+        "soft_position_limit": 35,
     },
 }
 
