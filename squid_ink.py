@@ -109,8 +109,9 @@ class Trader:
 
             result[product] = orders
 
+        # Update capital (demo logic, placeholder for actual PnL update)
         capital += 10
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
-        conversions = 1
-        return result, conversions, traderData
+
+        return result, 1, traderData
