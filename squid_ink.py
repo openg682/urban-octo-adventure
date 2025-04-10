@@ -112,4 +112,5 @@ class Trader:
         capital += 10
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
-        return result, 1, traderData
+        conversions = 1
+        return result, conversions, traderData
