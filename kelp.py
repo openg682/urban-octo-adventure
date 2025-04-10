@@ -8,7 +8,7 @@ class Product:
 
 PARAMS = {
     Product.KELP: {
-        "fair_value": 2030,
+        "fair_value": 2015,
         "take_width": 5,  # Very small take_width to trade closer to market
         "clear_width": 5,  # Tight clear_width to clear position faster
         "disregard_edge": 5,  # Lower disregard edge to take orders closer to market
