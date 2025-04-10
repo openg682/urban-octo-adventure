@@ -9,22 +9,22 @@ class Product:
 PARAMS = {
     Product.KELP: {
         "fair_value": 2030,
-        "take_width": 15,
-        "clear_width": 5,
-        "disregard_edge": 25,
-        "join_edge": 10,
-        "default_edge": 15,
-        "soft_position_limit": 40,
+        "take_width": 5,  # Very small take_width to trade closer to market
+        "clear_width": 5,  # Tight clear_width to clear position faster
+        "disregard_edge": 5,  # Lower disregard edge to take orders closer to market
+        "join_edge": 5,  # Lower join edge to participate in tight spreads
+        "default_edge": 5,  # Tight default edge
+        "soft_position_limit": 200,  # Much larger position limit
     },
 }
 
 class Trader:
     def __init__(self):
         self.params = PARAMS
-        self.LIMIT = {p: 40 for p in PARAMS}
+        self.LIMIT = {p: 200 for p in PARAMS}  # Increased position limit to 200 for aggressive trading
         self.mid_price_history = {product: [] for product in PARAMS}
         self.window = 10
-        self.default_min_spread = 1
+        self.default_min_spread = 0  # No minimum spread restriction for maximum aggression
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -54,7 +54,7 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
-        # Always market make for KELP
+        # Market make even if the spread is tight (aggressive)
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, bid, buy_qty))
@@ -70,6 +70,7 @@ class Trader:
         asks = [p for p in order_depth.sell_orders if p > fair_value + disregard_edge]
         bids = [p for p in order_depth.buy_orders if p < fair_value - disregard_edge]
 
+        # Aggressively select bids and asks
         ask = round(fair_value + default_edge, 2)
         if asks:
             best_ask = min(asks)
@@ -105,17 +106,14 @@ class Trader:
             if len(self.mid_price_history[product]) > self.window:
                 self.mid_price_history[product].pop(0)
 
-            volatility = np.std(self.mid_price_history[product]) if len(self.mid_price_history[product]) >= 2 else 0
-            dynamic_take_width = max(10, volatility * 1.5)
-        else:
-            dynamic_take_width = p["take_width"]
-
         fair_value = p["fair_value"]
 
-        b, s = self.take_best_orders(product, fair_value, dynamic_take_width, orders, order_depth, position)
+        # Take the best orders for maximum aggressiveness
+        b, s = self.take_best_orders(product, fair_value, p["take_width"], orders, order_depth, position)
         buy_volume += b
         sell_volume += s
 
+        # Aggressively make orders
         b, s = self.make_orders(
             product, order_depth, fair_value, position, buy_volume, sell_volume,
             p["disregard_edge"], p["join_edge"], p["default_edge"]
