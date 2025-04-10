@@ -9,38 +9,22 @@ class Product:
 PARAMS = {
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 15,  # Decreased the take width for more aggressive trading
+        "take_width": 25,
         "clear_width": 20,
-        "disregard_edge": 80,  # Reduced the disregard edge to increase activity
-        "join_edge": 15,  # Reduced join edge for faster market making
-        "default_edge": 25,  # Adjusted the default edge for more aggressive pricing
-        "soft_position_limit": 75,  # Increased the soft position limit for larger positions
+        "disregard_edge": 100,
+        "join_edge": 20,
+        "default_edge": 35,
+        "soft_position_limit": 45,
     },
 }
 
 class Trader:
     def __init__(self):
         self.params = PARAMS
-        self.LIMIT = {p: 75 for p in PARAMS}  # Increased position limits
+        self.LIMIT = {p: 45 for p in PARAMS}
         self.mid_price_history = {product: [] for product in PARAMS}
-        self.window = 5  # Shorter window for faster reactions to price movements
+        self.window = 10
         self.default_min_spread = 1
-
-    def calculate_volatility(self, prices):
-        """Calculate volatility using standard deviation."""
-        if len(prices) > 1:
-            return np.std(prices)
-        return 0
-
-    def calculate_dynamic_fair_value(self, prices):
-        """Calculate fair value as a moving average."""
-        if len(prices) > 1:
-            return np.mean(prices)
-        return self.params[Product.SQUID_INK]["fair_value"]
-    
-    def calculate_dynamic_take_width(self, volatility):
-        """Adjust take width based on volatility, but more aggressively."""
-        return max(10, volatility * 1.5)  # More aggressive adjustment for volatility
 
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
         position_limit = self.LIMIT[product]
@@ -70,7 +54,7 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
-        """Market making logic for Squid Ink with increased aggression."""
+        # Always market make for SQUID_INK
         buy_qty = self.LIMIT[product] - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, bid, buy_qty))
@@ -115,20 +99,15 @@ class Trader:
 
         buy_volume = sell_volume = 0
 
-        # Record mid price history for volatility calculation
         if order_depth.buy_orders and order_depth.sell_orders:
             mid_price = (max(order_depth.buy_orders) + min(order_depth.sell_orders)) / 2
             self.mid_price_history[product].append(mid_price)
             if len(self.mid_price_history[product]) > self.window:
                 self.mid_price_history[product].pop(0)
 
-        # Calculate dynamic fair value and volatility
-        fair_value = self.calculate_dynamic_fair_value(self.mid_price_history[product])
-        volatility = self.calculate_volatility(self.mid_price_history[product])
-        take_width = self.calculate_dynamic_take_width(volatility)
+        fair_value = p["fair_value"]
 
-        # Trading logic
-        b, s = self.take_best_orders(product, fair_value, take_width, orders, order_depth, position)
+        b, s = self.take_best_orders(product, fair_value, p["take_width"], orders, order_depth, position)
         buy_volume += b
         sell_volume += s
 
@@ -140,7 +119,7 @@ class Trader:
         sell_volume += s
 
         result[product] = orders
-        capital += 1  # Simulating capital change
+        capital += 1
         traderObject["capital"] = capital
         traderData = jsonpickle.encode(traderObject)
 
