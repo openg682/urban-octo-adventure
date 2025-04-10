@@ -11,9 +11,9 @@ class Product:
 PARAMS = {
     Product.KELP: {
         "fair_value": 2015,
-        "take_width": 10,
+        "take_width": 5,
         "clear_width": 10,
-        "disregard_edge": 30,
+        "disregard_edge": 20,
         "join_edge": 5,
         "default_edge": 10,
         "soft_position_limit": 100,
@@ -29,9 +29,9 @@ PARAMS = {
     },
     Product.SQUID_INK: {
         "fair_value": 1968,
-        "take_width": 20,
+        "take_width": 15,
         "clear_width": 10,
-        "disregard_edge": 60,
+        "disregard_edge": 70,
         "join_edge": 20,
         "default_edge": 35,
         "soft_position_limit": 45,
