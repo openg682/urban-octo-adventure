@@ -513,5 +513,5 @@ class Trader:
 
 
         traderData = self._save_trader_data()
-        conversions = 0
+        conversions = 1
         return result, conversions, traderData
