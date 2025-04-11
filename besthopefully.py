@@ -27,21 +27,21 @@ class Product:
 PARAMS = {
     # KELP: Relatively Stable
     Product.KELP: {
-        "static_fair_value": 2032, # Fallback only
-        "take_width": 1.5, "clear_width": 1, "disregard_edge": 10, "join_edge": 1, "default_edge": 2,
-        "soft_position_limit": 90,
+        "static_fair_value": 2015, # Fallback only
+        "take_width": 5, "clear_width": 10, "disregard_edge": 20, "join_edge": 5, "default_edge": 10,
+        "soft_position_limit": 50,
     },
     # RAINFOREST_RESIN: Stable around 10000
     Product.RAINFOREST_RESIN: {
         "static_fair_value": 10000, # Fallback only
-        "take_width": 4, "clear_width": 3, "disregard_edge": 15, "join_edge": 2, "default_edge": 5,
-        "soft_position_limit": 135,
+        "take_width": 0.001, "clear_width": 0.0005, "disregard_edge": 0.01, "join_edge": 0.0005, "default_edge": 0.001,
+        "soft_position_limit": 50,
     },
     # SQUID_INK: Drifts Down
     Product.SQUID_INK: {
-        "static_fair_value": 1900, # Fallback only
-        "take_width": 1.5, "clear_width": 1, "disregard_edge": 20, "join_edge": 1, "default_edge": 2,
-        "soft_position_limit": 40,
+        "static_fair_value": 1968, # Fallback only
+        "take_width": 15, "clear_width": 10, "disregard_edge": 70, "join_edge": 20, "default_edge": 35,
+        "soft_position_limit": 45,
     },
     # CROISSANTS: Drifts Down
     Product.CROISSANTS: {
