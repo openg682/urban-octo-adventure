@@ -1,24 +1,38 @@
-import zipfile
-import os
+import subprocess
+import sys
+
+# Function to install pandas if not installed
+def install_pandas():
+    try:
+        import pandas as pd
+        print("Pandas is already installed!")
+    except ImportError:
+        print("Pandas not found, installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas"])
+
+# Function to install numpy if not installed
+def install_numpy():
+    try:
+        import numpy as np
+        print("NumPy is already installed!")
+    except ImportError:
+        print("NumPy not found, installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
+
+# Call the functions to ensure pandas and numpy are installed
+install_pandas()
+install_numpy()
+
+print("\nEnsured pandas and numpy are installed.")
+
+# You can now import and use pandas and numpy in your script
 import pandas as pd
+import numpy as np
 
-# Path to your zip file
-zip_path = "round-1-island-data-bottle.zip"
-extract_path = "unzipped_data"
-
-# Unzip the file
-with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-    zip_ref.extractall(extract_path)
-
-# List contents to find relevant data files
-for root, dirs, files in os.walk(extract_path):
-    for file in files:
-        print(os.path.join(root, file))
-# Let's say you found a file like 'prices.csv' after extracting
 df = pd.read_csv("unzipped_data/day_1/prices.csv")  # update path as needed
 
 # Filter for only the 3 commodities
-commodities = ["RAINFLOWER_RESIN", "KELP", "SQUID_INK"]
+commodities = ["CROISSANT", "JAM", "DJEMBE"]
 df_filtered = df[df['product'].isin(commodities)]
 
 # Calculate mid prices and fair values
