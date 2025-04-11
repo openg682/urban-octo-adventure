@@ -477,4 +477,4 @@ class Trader:
 
         traderData = self._save_trader_data()
         conversions = 0
-        return result, conversions, traderDataf
+        return result, conversions, traderData
