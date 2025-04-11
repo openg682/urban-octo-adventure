@@ -11,14 +11,14 @@ class Product:
     SQUID_INK = "SQUID_INK"
     CROISSANTS = "CROISSANTS" # Match data file name
     JAMS = "JAMS"         # Match data file name
-    DJEMBES = "DJEMBESS"       # Match data file name (used DJEMBES in LIMIT/PARAMS keys for consistency)
+    DJEMBE = "DJEMBE"       # Match data file name (used DJEMBE in LIMIT/PARAMS keys for consistency)
     PICNIC_BASKET1 = "PICNIC_BASKET1"
     PICNIC_BASKET2 = "PICNIC_BASKET2"
     # Helper list of all product names matching the data files/class constants
-    ALL = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBES, PICNIC_BASKET1, PICNIC_BASKET2]
-    MARKET_MAKING_PRODUCTS = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBES] # Products for basic MM
+    ALL = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBE, PICNIC_BASKET1, PICNIC_BASKET2]
+    MARKET_MAKING_PRODUCTS = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBE] # Products for basic MM
     BASKET_PRODUCTS = [PICNIC_BASKET1, PICNIC_BASKET2]
-    BASKET1_COMPONENTS = {CROISSANTS: 6, JAMS: 3, DJEMBES: 1}
+    BASKET1_COMPONENTS = {CROISSANTS: 6, JAMS: 3, DJEMBE: 1}
     BASKET2_COMPONENTS = {CROISSANTS: 4, JAMS: 2}
 
 
@@ -55,8 +55,8 @@ PARAMS = {
         "take_width": 1, "clear_width": 0.5, "disregard_edge": 6, "join_edge": 0.5, "default_edge": 1.5,
         "soft_position_limit": 315,
     },
-    # DJEMBES: Drifts Down
-    Product.DJEMBES: { # Using DJEMBES as key, matches data name DJEMBESS
+    # DJEMBE: Drifts Down
+    Product.DJEMBE: { # Using DJEMBE as key, matches data name DJEMBE
         "static_fair_value": 13380, # Fallback only
         "take_width": 1, "clear_width": 0.5, "disregard_edge": 10, "join_edge": 0.5, "default_edge": 1,
         "soft_position_limit": 54,
@@ -86,7 +86,7 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = { # Hard position limits
             Product.KELP: 100, Product.RAINFOREST_RESIN: 150, Product.SQUID_INK: 45,
-            Product.CROISSANTS: 250, Product.JAMS: 350, Product.DJEMBES: 60,
+            Product.CROISSANTS: 250, Product.JAMS: 350, Product.DJEMBE: 60,
             Product.PICNIC_BASKET1: 60, Product.PICNIC_BASKET2: 100,
         }
         self.window = 10 # SMA window size
