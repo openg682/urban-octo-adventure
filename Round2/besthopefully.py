@@ -84,7 +84,7 @@ class Trader:
 
         # --- Strategy Parameters ---
         self.params = PARAMS
-        self.LIMIT = { # Hard position limits
+        self.LIMIT = { # Original hard position limits (now redundant for enforcement)
             Product.KELP: 100, Product.RAINFOREST_RESIN: 150, Product.SQUID_INK: 45,
             Product.CROISSANTS: 250, Product.JAMS: 350, Product.DJEMBE: 60,
             Product.PICNIC_BASKET1: 60, Product.PICNIC_BASKET2: 100,
@@ -215,13 +215,12 @@ class Trader:
     # --- Trading Logic Functions (_take_best_orders, _market_make, _make_orders, arbitrage_baskets) ---
     # These remain unchanged from the previous version *except* for ensuring product names match class constants
 
-    # Generic Take Best Orders Function - Respects Soft Limits
+    # Generic Take Best Orders Function - Respects Soft Limits (Now Hard)
     def _take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
-        position_limit_hard = self.LIMIT[product]
-        position_limit_soft = self.params[product]["soft_position_limit"]
+        position_limit = self.params[product]["soft_position_limit"]
         buy_volume = sell_volume = 0
 
-        if abs(position) >= position_limit_hard:
+        if abs(position) >= position_limit:
             return 0, 0
 
         if order_depth.sell_orders:
@@ -229,10 +228,7 @@ class Trader:
                 best_ask = min(order_depth.sell_orders)
                 if best_ask <= fair_value - take_width:
                     ask_volume = -order_depth.sell_orders[best_ask]
-                    if position < 0: max_qty_soft = position_limit_hard - position
-                    else: max_qty_soft = max(0, position_limit_soft - position)
-                    qty_allowed = min(ask_volume, max_qty_soft)
-                    qty_allowed = min(qty_allowed, position_limit_hard - position)
+                    qty_allowed = min(ask_volume, position_limit - position)
                     qty = max(0, int(qty_allowed))
                     if qty > 0:
                         orders.append(Order(product, best_ask, qty))
@@ -244,10 +240,7 @@ class Trader:
                 best_bid = max(order_depth.buy_orders)
                 if best_bid >= fair_value + take_width:
                     bid_volume = order_depth.buy_orders[best_bid]
-                    if position > 0: max_qty_soft = position_limit_hard + position
-                    else: max_qty_soft = max(0, position_limit_soft + position)
-                    qty_allowed = min(bid_volume, max_qty_soft)
-                    qty_allowed = min(qty_allowed, position_limit_hard + position)
+                    qty_allowed = min(bid_volume, position_limit + position) # + because position is negative for short
                     qty = max(0, int(qty_allowed))
                     if qty > 0:
                         orders.append(Order(product, best_bid, -qty))
@@ -255,24 +248,23 @@ class Trader:
             except Exception as e: print(f"Error taking bid {product}: {e}")
         return buy_volume, sell_volume
 
-    # Generic Market Make Function - Targets Soft Limits for Quantity
+    # Generic Market Make Function - Targets Soft Limits (Now Hard) for Quantity
     def _market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume):
-        position_limit_hard = self.LIMIT[product]
-        position_limit_soft = self.params[product]["soft_position_limit"]
+        position_limit = self.params[product]["soft_position_limit"]
 
         current_buy_exposure = position + buy_volume
-        buy_target = position_limit_soft
+        buy_target = position_limit
         buy_qty = max(0, buy_target - current_buy_exposure)
-        buy_qty = min(buy_qty, max(0, position_limit_hard - current_buy_exposure))
         buy_qty = int(buy_qty)
-        if buy_qty > 0: orders.append(Order(product, int(round(bid)), buy_qty)) # Convert bid to integer
+        if buy_qty > 0 and current_buy_exposure + buy_qty <= position_limit:
+            orders.append(Order(product, int(round(bid)), buy_qty)) # Convert bid to integer
 
         current_sell_exposure = position - sell_volume
-        sell_target = -position_limit_soft
+        sell_target = -position_limit
         sell_qty = max(0, current_sell_exposure - sell_target)
-        sell_qty = min(sell_qty, max(0, position_limit_hard + current_sell_exposure))
         sell_qty = int(sell_qty)
-        if sell_qty > 0: orders.append(Order(product, int(round(ask)), -sell_qty)) # Convert ask to integer
+        if sell_qty > 0 and current_sell_exposure - sell_qty >= -position_limit:
+            orders.append(Order(product, int(round(ask)), -sell_qty)) # Convert ask to integer
         return
 
     # Generic Make Orders Function - Implements Skewing with clear_width
@@ -328,7 +320,7 @@ class Trader:
         self._market_make(product, orders, bid, ask, pos, buy_volume, sell_volume)
         return orders
 
-    # Basket Arbitrage - Uses per-basket thresholds
+    # Basket Arbitrage - Uses per-basket thresholds and Soft Limits (Now Hard)
     def arbitrage_baskets(self, state: TradingState):
         orders: List[Order] = []
         order_depths = state.order_depths
@@ -339,8 +331,10 @@ class Trader:
         required_comps1 = Product.BASKET1_COMPONENTS
         component_prods1 = list(required_comps1.keys())
         threshold1 = self.arbitrage_thresholds[basket1_prod]
+        basket1_limit = self.params[basket1_prod]["soft_position_limit"]
+        component_limits1 = {comp: self.params[comp]["soft_position_limit"] for comp in component_prods1}
+
         if basket1_prod in order_depths and all(comp in order_depths for comp in component_prods1):
-            # (Logic as before, using threshold1)
             basket1_depth = order_depths[basket1_prod]
             component_depths1 = {comp: order_depths[comp] for comp in component_prods1}
             basket1_pos = positions.get(basket1_prod, 0)
@@ -356,13 +350,23 @@ class Trader:
                         basket_ask_vol = -basket1_depth.sell_orders[best_basket1_ask]
                         comp_bid_vols = {comp: component_depths1[comp].buy_orders[best_comp_bids1[comp]] for comp in component_prods1}
                         max_vol_from_comps = min(comp_bid_vols[comp] // qty for comp, qty in required_comps1.items() if qty > 0)
-                        max_vol_basket_pos = self.LIMIT[basket1_prod] - basket1_pos
-                        max_vol_comps_pos = min((self.LIMIT[comp] + component_pos1[comp]) // qty for comp, qty in required_comps1.items() if qty > 0)
+                        max_vol_basket_pos = basket1_limit - basket1_pos
+                        max_vol_comps_pos = min((component_limits1[comp] + component_pos1[comp]) // qty for comp, qty in required_comps1.items() if qty > 0)
                         trade_vol = min(basket_ask_vol, max_vol_from_comps, max_vol_basket_pos, max_vol_comps_pos)
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket1_prod, best_basket1_ask, trade_vol))
-                            for comp, qty in required_comps1.items(): orders.append(Order(comp, best_comp_bids1[comp], -trade_vol * qty))
+                            for comp, qty in required_comps1.items():
+                                if component_pos1[comp] - trade_vol * qty >= -component_limits1[comp]:
+                                    orders.append(Order(comp, best_comp_bids1[comp], -trade_vol * qty))
+                                else:
+                                    trade_vol = min(trade_vol, int((component_limits1[comp] + component_pos1[comp]) // qty))
+                                    if trade_vol <= 0:
+                                        orders.pop() # Remove the basket order if no components can be bought
+                                        break
+                            else: # Only execute basket order if all components can be traded
+                                pass # Keep the basket order
+
                 except Exception as e: print(f"Error in Buy Basket 1 Arb: {e}")
 
             if basket1_depth.buy_orders and all(comp in component_depths1 and component_depths1[comp].sell_orders for comp in component_prods1):
@@ -375,13 +379,22 @@ class Trader:
                         basket_bid_vol = basket1_depth.buy_orders[best_basket1_bid]
                         comp_ask_vols = {comp: -component_depths1[comp].sell_orders[best_comp_asks1[comp]] for comp in component_prods1}
                         max_vol_from_comps = min(comp_ask_vols[comp] // qty for comp, qty in required_comps1.items() if qty > 0)
-                        max_vol_basket_pos = self.LIMIT[basket1_prod] + basket1_pos
-                        max_vol_comps_pos = min((self.LIMIT[comp] - component_pos1[comp]) // qty for comp, qty in required_comps1.items() if qty > 0)
+                        max_vol_basket_pos = basket1_limit + basket1_pos
+                        max_vol_comps_pos = min((component_limits1[comp] - component_pos1[comp]) // qty for comp, qty in required_comps1.items() if qty > 0)
                         trade_vol = min(basket_bid_vol, max_vol_from_comps, max_vol_basket_pos, max_vol_comps_pos)
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket1_prod, best_basket1_bid, -trade_vol))
-                            for comp, qty in required_comps1.items(): orders.append(Order(comp, best_comp_asks1[comp], trade_vol * qty))
+                            for comp, qty in required_comps1.items():
+                                if component_pos1[comp] + trade_vol * qty <= component_limits1[comp]:
+                                    orders.append(Order(comp, best_comp_asks1[comp], trade_vol * qty))
+                                else:
+                                    trade_vol = min(trade_vol, int((component_limits1[comp] - component_pos1[comp]) // qty))
+                                    if trade_vol <= 0:
+                                        orders.pop() # Remove the basket order if no components can be sold
+                                        break
+                            else: # Only execute basket order if all components can be traded
+                                pass # Keep the basket order
                 except Exception as e: print(f"Error in Sell Basket 1 Arb: {e}")
 
 
@@ -390,8 +403,10 @@ class Trader:
         required_comps2 = Product.BASKET2_COMPONENTS
         component_prods2 = list(required_comps2.keys())
         threshold2 = self.arbitrage_thresholds[basket2_prod]
+        basket2_limit = self.params[basket2_prod]["soft_position_limit"]
+        component_limits2 = {comp: self.params[comp]["soft_position_limit"] for comp in component_prods2}
+
         if basket2_prod in order_depths and all(comp in order_depths for comp in component_prods2):
-            # (Logic as before, using threshold2)
             basket2_depth = order_depths[basket2_prod]
             component_depths2 = {comp: order_depths[comp] for comp in component_prods2}
             basket2_pos = positions.get(basket2_prod, 0)
@@ -407,13 +422,22 @@ class Trader:
                         basket_ask_vol = -basket2_depth.sell_orders[best_basket2_ask]
                         comp_bid_vols = {comp: component_depths2[comp].buy_orders[best_comp_bids2[comp]] for comp in component_prods2}
                         max_vol_from_comps = min(comp_bid_vols[comp] // qty for comp, qty in required_comps2.items() if qty > 0)
-                        max_vol_basket_pos = self.LIMIT[basket2_prod] - basket2_pos
-                        max_vol_comps_pos = min((self.LIMIT[comp] + component_pos2[comp]) // qty for comp, qty in required_comps2.items() if qty > 0)
+                        max_vol_basket_pos = basket2_limit - basket2_pos
+                        max_vol_comps_pos = min((component_limits2[comp] + component_pos2[comp]) // qty for comp, qty in required_comps2.items() if qty > 0)
                         trade_vol = min(basket_ask_vol, max_vol_from_comps, max_vol_basket_pos, max_vol_comps_pos)
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket2_prod, best_basket2_ask, trade_vol))
-                            for comp, qty in required_comps2.items(): orders.append(Order(comp, best_comp_bids2[comp], -trade_vol * qty))
+                            for comp, qty in required_comps2.items():
+                                if component_pos2[comp] - trade_vol * qty >= -component_limits2[comp]:
+                                    orders.append(Order(comp, best_comp_bids2[comp], -trade_vol * qty))
+                                else:
+                                    trade_vol = min(trade_vol, int((component_limits2[comp] + component_pos2[comp]) // qty))
+                                    if trade_vol <= 0:
+                                        orders.pop() # Remove the basket order if no components can be bought
+                                        break
+                            else: # Only execute basket order if all components can be traded
+                                pass # Keep the basket order
                 except Exception as e: print(f"Error in Buy Basket 2 Arb: {e}")
 
             if basket2_depth.buy_orders and all(comp in component_depths2 and component_depths2[comp].sell_orders for comp in component_prods2):
@@ -426,13 +450,22 @@ class Trader:
                         basket_bid_vol = basket2_depth.buy_orders[best_basket2_bid]
                         comp_ask_vols = {comp: -component_depths2[comp].sell_orders[best_comp_asks2[comp]] for comp in component_prods2}
                         max_vol_from_comps = min(comp_ask_vols[comp] // qty for comp, qty in required_comps2.items() if qty > 0)
-                        max_vol_basket_pos = self.LIMIT[basket2_prod] + basket2_pos
-                        max_vol_comps_pos = min((self.LIMIT[comp] - component_pos2[comp]) // qty for comp, qty in required_comps2.items() if qty > 0)
+                        max_vol_basket_pos = basket2_limit + basket2_pos
+                        max_vol_comps_pos = min((component_limits2[comp] - component_pos2[comp]) // qty for comp, qty in required_comps2.items() if qty > 0)
                         trade_vol = min(basket_bid_vol, max_vol_from_comps, max_vol_basket_pos, max_vol_comps_pos)
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket2_prod, best_basket2_bid, -trade_vol))
-                            for comp, qty in required_comps2.items(): orders.append(Order(comp, best_comp_asks2[comp], trade_vol * qty))
+                            for comp, qty in required_comps2.items():
+                                if component_pos2[comp] + trade_vol * qty <= component_limits2[comp]:
+                                    orders.append(Order(comp, best_comp_asks2[comp], trade_vol * qty))
+                                else:
+                                    trade_vol = min(trade_vol, int((component_limits2[comp] - component_pos2[comp]) // qty))
+                                    if trade_vol <= 0:
+                                        orders.pop() # Remove the basket order if no components can be sold
+                                        break
+                            else: # Only execute basket order if all components can be traded
+                                pass # Keep the basket order
                 except Exception as e: print(f"Error in Sell Basket 2 Arb: {e}")
         return orders
 
