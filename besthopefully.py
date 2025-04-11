@@ -10,15 +10,15 @@ class Product:
     RAINFOREST_RESIN = "RAINFOREST_RESIN"
     SQUID_INK = "SQUID_INK"
     CROISSANTS = "CROISSANTS" # Match data file name
-    JAMS = "JAMS"             # Match data file name
-    DJEMBE = "DJEMBES"        # Match data file name (used DJEMBE in LIMIT/PARAMS keys for consistency)
+    JAMS = "JAMS"         # Match data file name
+    DJEMBES = "DJEMBESS"       # Match data file name (used DJEMBES in LIMIT/PARAMS keys for consistency)
     PICNIC_BASKET1 = "PICNIC_BASKET1"
     PICNIC_BASKET2 = "PICNIC_BASKET2"
     # Helper list of all product names matching the data files/class constants
-    ALL = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBE, PICNIC_BASKET1, PICNIC_BASKET2]
-    MARKET_MAKING_PRODUCTS = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBE] # Products for basic MM
+    ALL = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBES, PICNIC_BASKET1, PICNIC_BASKET2]
+    MARKET_MAKING_PRODUCTS = [KELP, RAINFOREST_RESIN, SQUID_INK, CROISSANTS, JAMS, DJEMBES] # Products for basic MM
     BASKET_PRODUCTS = [PICNIC_BASKET1, PICNIC_BASKET2]
-    BASKET1_COMPONENTS = {CROISSANTS: 6, JAMS: 3, DJEMBE: 1}
+    BASKET1_COMPONENTS = {CROISSANTS: 6, JAMS: 3, DJEMBES: 1}
     BASKET2_COMPONENTS = {CROISSANTS: 4, JAMS: 2}
 
 
@@ -55,8 +55,8 @@ PARAMS = {
         "take_width": 1, "clear_width": 0.5, "disregard_edge": 6, "join_edge": 0.5, "default_edge": 1.5,
         "soft_position_limit": 315,
     },
-    # DJEMBE: Drifts Down
-    Product.DJEMBE: { # Using DJEMBE as key, matches data name DJEMBES
+    # DJEMBES: Drifts Down
+    Product.DJEMBES: { # Using DJEMBES as key, matches data name DJEMBESS
         "static_fair_value": 13380, # Fallback only
         "take_width": 1, "clear_width": 0.5, "disregard_edge": 10, "join_edge": 0.5, "default_edge": 1,
         "soft_position_limit": 54,
@@ -86,7 +86,7 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = { # Hard position limits
             Product.KELP: 100, Product.RAINFOREST_RESIN: 150, Product.SQUID_INK: 45,
-            Product.CROISSANTS: 250, Product.JAMS: 350, Product.DJEMBE: 60,
+            Product.CROISSANTS: 250, Product.JAMS: 350, Product.DJEMBES: 60,
             Product.PICNIC_BASKET1: 60, Product.PICNIC_BASKET2: 100,
         }
         self.window = 10 # SMA window size
@@ -103,26 +103,26 @@ class Trader:
                 data = jsonpickle.decode(traderData)
                 for key in self.persisted_keys:
                     if key in data and data[key] is not None: # Check if key exists and value is not None
-                         # Basic type validation could be added here if needed
-                         setattr(self, key, data[key])
+                        # Basic type validation could be added here if needed
+                        setattr(self, key, data[key])
             except Exception as e:
                 print(f"Error loading traderData: {e}. Using defaults.")
         # Ensure default structures exist if loading failed or data was partial/empty
         for product in Product.ALL:
             if not hasattr(self, 'mid_price_history') or product not in self.mid_price_history:
-                 if not hasattr(self, 'mid_price_history'): self.mid_price_history = {}
-                 self.mid_price_history[product] = []
+                if not hasattr(self, 'mid_price_history'): self.mid_price_history = {}
+                self.mid_price_history[product] = []
             if not hasattr(self, 'pnl') or product not in self.pnl:
-                 if not hasattr(self, 'pnl'): self.pnl = {}
-                 self.pnl[product] = 0.0
+                if not hasattr(self, 'pnl'): self.pnl = {}
+                self.pnl[product] = 0.0
 
 
     def _save_trader_data(self) -> str:
         """Saves state variables to traderData string."""
         data_to_save = {}
         for key in self.persisted_keys:
-             # Ensure the attribute exists before trying to save it
-             if hasattr(self, key):
+            # Ensure the attribute exists before trying to save it
+            if hasattr(self, key):
                 data_to_save[key] = getattr(self, key)
         return jsonpickle.encode(data_to_save)
 
@@ -153,7 +153,7 @@ class Trader:
 
         # Update history if we got a valid mid-price
         if current_mid_price is not None:
-             # Ensure the history list exists for the product
+            # Ensure the history list exists for the product
             if product not in self.mid_price_history: self.mid_price_history[product] = []
             self.mid_price_history[product].append(current_mid_price)
             # Trim history to window size
@@ -163,12 +163,12 @@ class Trader:
         # Calculate SMA fair value
         history = self.mid_price_history.get(product, []) # Use .get for safety
         if history:
-             # Use SMA if enough data points, otherwise use average of available points
+            # Use SMA if enough data points, otherwise use average of available points
             min_points_for_sma = max(1, self.window // 2) # Require at least 1 or half window
             if len(history) >= min_points_for_sma:
-                 fair_value = np.mean(history)
+                fair_value = np.mean(history)
             else: # Use last known mid price if history is too short but non-empty
-                 fair_value = history[-1]
+                fair_value = history[-1]
             self.current_fair_values[product] = fair_value
         else:
             # Fallback if no history at all: use static estimate
@@ -183,13 +183,13 @@ class Trader:
             fv_basket = 0.0
             components_ready = True
             for comp, qty in Product.BASKET1_COMPONENTS.items():
-                 # Use .get for component fair value for safety
-                 comp_fv = self.current_fair_values.get(comp)
-                 if comp_fv is not None:
-                     fv_basket += qty * comp_fv
-                 else:
-                     components_ready = False
-                     break
+                # Use .get for component fair value for safety
+                comp_fv = self.current_fair_values.get(comp)
+                if comp_fv is not None:
+                    fv_basket += qty * comp_fv
+                else:
+                    components_ready = False
+                    break
             if components_ready:
                 self.current_fair_values[product] = fv_basket
             # Else: Keep the potentially existing static/last value if components aren't ready
@@ -198,12 +198,12 @@ class Trader:
             fv_basket = 0.0
             components_ready = True
             for comp, qty in Product.BASKET2_COMPONENTS.items():
-                 comp_fv = self.current_fair_values.get(comp)
-                 if comp_fv is not None:
-                     fv_basket += qty * comp_fv
-                 else:
-                     components_ready = False
-                     break
+                comp_fv = self.current_fair_values.get(comp)
+                if comp_fv is not None:
+                    fv_basket += qty * comp_fv
+                else:
+                    components_ready = False
+                    break
             if components_ready:
                 self.current_fair_values[product] = fv_basket
             # Else: Keep the potentially existing static/last value if components aren't ready
@@ -225,7 +225,7 @@ class Trader:
             return 0, 0
 
         if order_depth.sell_orders:
-             try:
+            try:
                 best_ask = min(order_depth.sell_orders)
                 if best_ask <= fair_value - take_width:
                     ask_volume = -order_depth.sell_orders[best_ask]
@@ -237,7 +237,7 @@ class Trader:
                     if qty > 0:
                         orders.append(Order(product, best_ask, qty))
                         buy_volume += qty
-             except Exception as e: print(f"Error taking ask {product}: {e}")
+            except Exception as e: print(f"Error taking ask {product}: {e}")
 
         if order_depth.buy_orders:
             try:
@@ -265,14 +265,14 @@ class Trader:
         buy_qty = max(0, buy_target - current_buy_exposure)
         buy_qty = min(buy_qty, max(0, position_limit_hard - current_buy_exposure))
         buy_qty = int(buy_qty)
-        if buy_qty > 0: orders.append(Order(product, bid, buy_qty))
+        if buy_qty > 0: orders.append(Order(product, int(round(bid)), buy_qty)) # Convert bid to integer
 
         current_sell_exposure = position - sell_volume
         sell_target = -position_limit_soft
         sell_qty = max(0, current_sell_exposure - sell_target)
         sell_qty = min(sell_qty, max(0, position_limit_hard + current_sell_exposure))
         sell_qty = int(sell_qty)
-        if sell_qty > 0: orders.append(Order(product, ask, -sell_qty))
+        if sell_qty > 0: orders.append(Order(product, int(round(ask)), -sell_qty)) # Convert ask to integer
         return
 
     # Generic Make Orders Function - Implements Skewing with clear_width
@@ -288,12 +288,12 @@ class Trader:
         skew_threshold = soft_limit * 0.5
         clear_width_val = p["clear_width"]
         if abs(pos) > skew_threshold and soft_limit > 0:
-             skew_factor = min(1.0, (abs(pos) - skew_threshold) / (soft_limit - skew_threshold + 1e-6))
-             skew_amount = clear_width_val * skew_factor
-             if pos > 0:
-                 ask_edge -= skew_amount; bid_edge += skew_amount
-             else:
-                 bid_edge -= skew_amount; ask_edge += skew_amount
+            skew_factor = min(1.0, (abs(pos) - skew_threshold) / (soft_limit - skew_threshold + 1e-6))
+            skew_amount = clear_width_val * skew_factor
+            if pos > 0:
+                ask_edge -= skew_amount; bid_edge += skew_amount
+            else:
+                bid_edge -= skew_amount; ask_edge += skew_amount
 
         min_edge = 0.01
         ask_edge = max(min_edge, ask_edge)
@@ -319,11 +319,11 @@ class Trader:
         except Exception as e: print(f"Error applying joining logic {product}: {e}")
 
         if bid >= ask - tick_size / 2:
-             mid_point = round(fair_value, round_digits)
-             spread = p["default_edge"] * 2
-             bid = round(mid_point - spread / 2, round_digits)
-             ask = round(mid_point + spread / 2, round_digits)
-             if bid >= ask: ask = bid + tick_size
+            mid_point = round(fair_value, round_digits)
+            spread = p["default_edge"] * 2
+            bid = round(mid_point - spread / 2, round_digits)
+            ask = round(mid_point + spread / 2, round_digits)
+            if bid >= ask: ask = bid + tick_size
 
         self._market_make(product, orders, bid, ask, pos, buy_volume, sell_volume)
         return orders
@@ -391,14 +391,14 @@ class Trader:
         component_prods2 = list(required_comps2.keys())
         threshold2 = self.arbitrage_thresholds[basket2_prod]
         if basket2_prod in order_depths and all(comp in order_depths for comp in component_prods2):
-             # (Logic as before, using threshold2)
+            # (Logic as before, using threshold2)
             basket2_depth = order_depths[basket2_prod]
             component_depths2 = {comp: order_depths[comp] for comp in component_prods2}
             basket2_pos = positions.get(basket2_prod, 0)
             component_pos2 = {comp: positions.get(comp, 0) for comp in component_prods2}
 
             if basket2_depth.sell_orders and all(comp in component_depths2 and component_depths2[comp].buy_orders for comp in component_prods2):
-                 try:
+                try:
                     best_basket2_ask = min(basket2_depth.sell_orders)
                     best_comp_bids2 = {comp: max(component_depths2[comp].buy_orders) for comp in component_prods2}
                     comp_sale_value = sum(best_comp_bids2[comp] * qty for comp, qty in required_comps2.items())
@@ -414,7 +414,7 @@ class Trader:
                         if trade_vol > 0:
                             orders.append(Order(basket2_prod, best_basket2_ask, trade_vol))
                             for comp, qty in required_comps2.items(): orders.append(Order(comp, best_comp_bids2[comp], -trade_vol * qty))
-                 except Exception as e: print(f"Error in Buy Basket 2 Arb: {e}")
+                except Exception as e: print(f"Error in Buy Basket 2 Arb: {e}")
 
             if basket2_depth.buy_orders and all(comp in component_depths2 and component_depths2[comp].sell_orders for comp in component_prods2):
                 try:
@@ -447,9 +447,9 @@ class Trader:
         component_products = set(Product.BASKET1_COMPONENTS.keys()) | set(Product.BASKET2_COMPONENTS.keys())
         other_mm_products = [p for p in Product.MARKET_MAKING_PRODUCTS if p not in component_products]
         for product in list(component_products) + other_mm_products:
-             if product in state.order_depths: self._update_fair_value(product, state)
+            if product in state.order_depths: self._update_fair_value(product, state)
         for product in Product.BASKET_PRODUCTS:
-             if product in state.order_depths: self._update_fair_value(product, state)
+            if product in state.order_depths: self._update_fair_value(product, state)
 
         # Market Making Loop
         products_to_mm = Product.MARKET_MAKING_PRODUCTS # Add baskets here if desired
@@ -468,11 +468,11 @@ class Trader:
         # Basket Arbitrage
         arbitrage_orders = self.arbitrage_baskets(state)
         for order in arbitrage_orders:
-             # *** USE order.symbol (Corrected) ***
+            # *** USE order.symbol (Corrected) ***
             if order.symbol in result:
-                 result[order.symbol].append(order)
+                result[order.symbol].append(order)
             else:
-                 print(f"Warning: Arbitrage order generated for unexpected product symbol '{order.symbol}'. Discarding.")
+                print(f"Warning: Arbitrage order generated for unexpected product symbol '{order.symbol}'. Discarding.")
 
 
         traderData = self._save_trader_data()
