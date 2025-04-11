@@ -28,48 +28,48 @@ PARAMS = {
     # KELP: Relatively Stable
     Product.KELP: {
         "static_fair_value": 2015, # Fallback only
-        "take_width": 5, "clear_width": 10, "disregard_edge": 20, "join_edge": 5, "default_edge": 10,
+        "take_width": 10, "clear_width": 10, "disregard_edge": 20, "join_edge": 5, "default_edge": 20, # Increased take_width and default_edge
         "soft_position_limit": 50,
     },
-    # RAINFOREST_RESIN: Stable around 10000
+    # RAINFOREST_RESIN: Stable around 10000 (Static Fair Value)
     Product.RAINFOREST_RESIN: {
         "static_fair_value": 10000, # Fallback only
-        "take_width": 0.001, "clear_width": 0.0005, "disregard_edge": 0.01, "join_edge": 0.0005, "default_edge": 0.001,
+        "take_width": 0.001, "clear_width": 0.0005, "disregard_edge": 0.01, "join_edge": 0.0005, "default_edge": 0.002, # Slightly increased default_edge
         "soft_position_limit": 50,
     },
     # SQUID_INK: Drifts Down
     Product.SQUID_INK: {
         "static_fair_value": 1968, # Fallback only
-        "take_width": 15, "clear_width": 10, "disregard_edge": 70, "join_edge": 20, "default_edge": 35,
+        "take_width": 30, "clear_width": 10, "disregard_edge": 70, "join_edge": 20, "default_edge": 70, # Increased take_width and default_edge
         "soft_position_limit": 45,
     },
     # CROISSANTS: Drifts Down
     Product.CROISSANTS: {
         "static_fair_value": 4300, # Fallback only
-        "take_width": 0.5, "clear_width": 0.5, "disregard_edge": 5, "join_edge": 0.5, "default_edge": 1,
+        "take_width": 1.0, "clear_width": 0.5, "disregard_edge": 5, "join_edge": 0.5, "default_edge": 2.0, # Increased take_width and default_edge
         "soft_position_limit": 225,
     },
     # JAMS: Drifts Down
     Product.JAMS: {
         "static_fair_value": 6550, # Fallback only
-        "take_width": 1, "clear_width": 0.5, "disregard_edge": 6, "join_edge": 0.5, "default_edge": 1.5,
+        "take_width": 2.0, "clear_width": 0.5, "disregard_edge": 6, "join_edge": 0.5, "default_edge": 3.0, # Increased take_width and default_edge
         "soft_position_limit": 315,
     },
     # DJEMBE: Drifts Down
     Product.DJEMBE: { # Using DJEMBE as key, matches data name DJEMBE
         "static_fair_value": 13380, # Fallback only
-        "take_width": 1, "clear_width": 0.5, "disregard_edge": 10, "join_edge": 0.5, "default_edge": 1,
+        "take_width": 2.0, "clear_width": 0.5, "disregard_edge": 10, "join_edge": 0.5, "default_edge": 2.0, # Increased take_width and default_edge
         "soft_position_limit": 54,
     },
     # --- Baskets: Fair value derived from dynamic component values ---
     Product.PICNIC_BASKET1: {
         "static_fair_value": 58800, # Fallback only
-        "take_width": 5, "clear_width": 3, "disregard_edge": 20, "join_edge": 2, "default_edge": 6,
+        "take_width": 10, "clear_width": 3, "disregard_edge": 20, "join_edge": 2, "default_edge": 12, # Increased take_width and default_edge
         "soft_position_limit": 54,
     },
     Product.PICNIC_BASKET2: {
         "static_fair_value": 30100, # Fallback only
-        "take_width": 3, "clear_width": 2, "disregard_edge": 15, "join_edge": 1.5, "default_edge": 4,
+        "take_width": 6, "clear_width": 2, "disregard_edge": 15, "join_edge": 1.5, "default_edge": 8, # Increased take_width and default_edge
         "soft_position_limit": 90,
     },
 }
@@ -91,7 +91,7 @@ class Trader:
         }
         self.window = 10 # SMA window size
         self.arbitrage_thresholds = { # Per-basket arb thresholds
-            Product.PICNIC_BASKET1: 5.0, Product.PICNIC_BASKET2: 4.0
+            Product.PICNIC_BASKET1: 10.0, Product.PICNIC_BASKET2: 8.0 # Increased arbitrage thresholds
         }
         # List of keys to automatically save/load from traderData
         self.persisted_keys = ["mid_price_history", "pnl"]
@@ -145,6 +145,10 @@ class Trader:
 
     def _update_fair_value(self, product: str, state: TradingState):
         """Calculates and updates the dynamic fair value using SMA."""
+        if product == Product.RAINFOREST_RESIN:
+            self.current_fair_values[product] = self.params[product]["static_fair_value"]
+            return self.current_fair_values[product]
+
         current_mid_price = None
         order_depth = state.order_depths.get(product)
 
@@ -356,16 +360,16 @@ class Trader:
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket1_prod, best_basket1_ask, trade_vol))
+                            can_trade_all_comps = True
                             for comp, qty in required_comps1.items():
-                                if component_pos1[comp] - trade_vol * qty >= -component_limits1[comp]:
+                                if component_pos1[comp] - trade_vol * qty < -component_limits1[comp]:
+                                    can_trade_all_comps = False
+                                    break
+                            if can_trade_all_comps:
+                                for comp, qty in required_comps1.items():
                                     orders.append(Order(comp, best_comp_bids1[comp], -trade_vol * qty))
-                                else:
-                                    trade_vol = min(trade_vol, int((component_limits1[comp] + component_pos1[comp]) // qty))
-                                    if trade_vol <= 0:
-                                        orders.pop() # Remove the basket order if no components can be bought
-                                        break
-                            else: # Only execute basket order if all components can be traded
-                                pass # Keep the basket order
+                            else:
+                                orders.pop() # Remove basket order if component limits are hit
 
                 except Exception as e: print(f"Error in Buy Basket 1 Arb: {e}")
 
@@ -385,16 +389,16 @@ class Trader:
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket1_prod, best_basket1_bid, -trade_vol))
+                            can_trade_all_comps = True
                             for comp, qty in required_comps1.items():
-                                if component_pos1[comp] + trade_vol * qty <= component_limits1[comp]:
+                                if component_pos1[comp] + trade_vol * qty > component_limits1[comp]:
+                                    can_trade_all_comps = False
+                                    break
+                            if can_trade_all_comps:
+                                for comp, qty in required_comps1.items():
                                     orders.append(Order(comp, best_comp_asks1[comp], trade_vol * qty))
-                                else:
-                                    trade_vol = min(trade_vol, int((component_limits1[comp] - component_pos1[comp]) // qty))
-                                    if trade_vol <= 0:
-                                        orders.pop() # Remove the basket order if no components can be sold
-                                        break
-                            else: # Only execute basket order if all components can be traded
-                                pass # Keep the basket order
+                            else:
+                                orders.pop() # Remove basket order if component limits are hit
                 except Exception as e: print(f"Error in Sell Basket 1 Arb: {e}")
 
 
@@ -428,16 +432,16 @@ class Trader:
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket2_prod, best_basket2_ask, trade_vol))
+                            can_trade_all_comps = True
                             for comp, qty in required_comps2.items():
-                                if component_pos2[comp] - trade_vol * qty >= -component_limits2[comp]:
+                                if component_pos2[comp] - trade_vol * qty < -component_limits2[comp]:
+                                    can_trade_all_comps = False
+                                    break
+                            if can_trade_all_comps:
+                                for comp, qty in required_comps2.items():
                                     orders.append(Order(comp, best_comp_bids2[comp], -trade_vol * qty))
-                                else:
-                                    trade_vol = min(trade_vol, int((component_limits2[comp] + component_pos2[comp]) // qty))
-                                    if trade_vol <= 0:
-                                        orders.pop() # Remove the basket order if no components can be bought
-                                        break
-                            else: # Only execute basket order if all components can be traded
-                                pass # Keep the basket order
+                            else:
+                                orders.pop() # Remove basket order if component limits are hit
                 except Exception as e: print(f"Error in Buy Basket 2 Arb: {e}")
 
             if basket2_depth.buy_orders and all(comp in component_depths2 and component_depths2[comp].sell_orders for comp in component_prods2):
@@ -456,16 +460,16 @@ class Trader:
                         trade_vol = max(0, int(trade_vol))
                         if trade_vol > 0:
                             orders.append(Order(basket2_prod, best_basket2_bid, -trade_vol))
+                            can_trade_all_comps = True
                             for comp, qty in required_comps2.items():
-                                if component_pos2[comp] + trade_vol * qty <= component_limits2[comp]:
+                                if component_pos2[comp] + trade_vol * qty > component_limits2[comp]:
+                                    can_trade_all_comps = False
+                                    break
+                            if can_trade_all_comps:
+                                for comp, qty in required_comps2.items():
                                     orders.append(Order(comp, best_comp_asks2[comp], trade_vol * qty))
-                                else:
-                                    trade_vol = min(trade_vol, int((component_limits2[comp] - component_pos2[comp]) // qty))
-                                    if trade_vol <= 0:
-                                        orders.pop() # Remove the basket order if no components can be sold
-                                        break
-                            else: # Only execute basket order if all components can be traded
-                                pass # Keep the basket order
+                            else:
+                                orders.pop() # Remove basket order if component limits are hit
                 except Exception as e: print(f"Error in Sell Basket 2 Arb: {e}")
         return orders
 
