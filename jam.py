@@ -125,24 +125,6 @@ class Trader:
 
         return result, 0, traderData
 
-# --- Simulation ---
-if __name__ == '__main__':
-    # Example Order Depth
-    order_depth_jams = OrderDepth()
-    order_depth_jams.buy_orders = {6549.0: 5, 6550.0: 10}
-    order_depth_jams.sell_orders = {6551.0: -7, 6552.0: -3}
-
-    # Example Trading State
-    trading_state = TradingState(
-        order_depths={Product.JAMS: order_depth_jams},
-        own_trades={},
-        market_trades={},
-        position={Product.JAMS: 10},
-        observations={},
-        infos={},
-        time=0,
-        traderData=None
-    )
 
     # Instantiate and run the trader
     trader = Trader()
