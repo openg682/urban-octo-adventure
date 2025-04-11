@@ -156,7 +156,7 @@ class Trader:
         return None
 
     def _update_fair_value(self, product: str, state: TradingState):
-        """Calculates and updates the dynamic fair value using SMA, except for RAINFOREST_RESIN."""
+        """Calculates and updates the dynamic fair value using SMA."""
         current_mid_price = None
         order_depth = state.order_depths.get(product)
 
@@ -172,9 +172,9 @@ class Trader:
             if len(self.mid_price_history[product]) > self.window:
                 self.mid_price_history[product] = self.mid_price_history[product][-self.window:]
 
-        # Calculate SMA fair value for all products except RAINFOREST_RESIN
+        # Calculate SMA fair value
         history = self.mid_price_history.get(product, []) # Use .get for safety
-        if history and product != Product.RAINFOREST_RESIN:
+        if history:
             # Use SMA if enough data points, otherwise use average of available points
             min_points_for_sma = max(1, self.window // 2) # Require at least 1 or half window
             if len(history) >= min_points_for_sma:
@@ -182,19 +182,10 @@ class Trader:
             else: # Use last known mid price if history is too short but non-empty
                 fair_value = history[-1]
             self.current_fair_values[product] = fair_value
-        elif product == Product.RAINFOREST_RESIN and history:
-            # For RAINFOREST_RESIN, we'll also use SMA as per the original logic
-            min_points_for_sma = max(1, self.window // 2)
-            if len(history) >= min_points_for_sma:
-                fair_value = np.mean(history)
-            else:
-                fair_value = history[-1]
-            self.current_fair_values[product] = fair_value
-        elif not history:
+        else:
             # Fallback if no history at all: use static estimate
             if not hasattr(self, 'current_fair_values'): self.current_fair_values = {}
             self.current_fair_values[product] = self.params[product]["static_fair_value"]
-
 
         # --- Special Handling for Baskets (Overwrite with derived value) ---
         # Ensure component fair values are calculated first (handled by order in `run`)
@@ -268,9 +259,6 @@ class Trader:
             orders.append(Order(product, sell_order_price, sell_quantity))
 
         return orders
-
-    # --- Trading Logic Functions (_take_best_orders, _market_make, _make_orders, arbitrage_baskets) ---
-    # These remain unchanged from the previous version *except* for ensuring product names match class constants
 
     # Generic Take Best Orders Function - Respects Soft Limits
     def _take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
@@ -397,7 +385,6 @@ class Trader:
         component_prods1 = list(required_comps1.keys())
         threshold1 = self.arbitrage_thresholds[basket1_prod]
         if basket1_prod in order_depths and all(comp in order_depths for comp in component_prods1):
-            # (Logic as before, using threshold1)
             basket1_depth = order_depths[basket1_prod]
             component_depths1 = {comp: order_depths[comp] for comp in component_prods1}
             basket1_pos = positions.get(basket1_prod, 0)
@@ -448,7 +435,6 @@ class Trader:
         component_prods2 = list(required_comps2.keys())
         threshold2 = self.arbitrage_thresholds[basket2_prod]
         if basket2_prod in order_depths and all(comp in order_depths for comp in component_prods2):
-            # (Logic as before, using threshold2)
             basket2_depth = order_depths[basket2_prod]
             component_depths2 = {comp: order_depths[comp] for comp in component_prods2}
             basket2_pos = positions.get(basket2_prod, 0)
@@ -508,36 +494,133 @@ class Trader:
         for product in Product.BASKET_PRODUCTS:
             if product in state.order_depths: self._update_fair_value(product, state)
 
-        # Market Making Loop
-        products_to_mm = Product.MARKET_MAKING_PRODUCTS # Add baskets here if desired
-        for product in products_to_mm:
-            if product in state.order_depths and product in self.current_fair_values:
-                order_depth = state.order_depths[product]
-                position = state.position.get(product, 0)
-                p_params = self.params[product]
-                fair_value = self.current_fair_values[product]
-                mm_orders_take = []
-                buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
-                result[product].extend(mm_orders_take)
-                mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
-                result[product].extend(mm_orders_make)
+        # --- Market Making Strategies ---
 
-        # Trend Following Strategy
-        products_to_trend_follow = Product.MARKET_MAKING_PRODUCTS # Apply trend following to the same products as MM
-        for product in products_to_trend_follow:
-            if product in state.order_depths and product in self.current_fair_values:
-                trend_orders = self._trend_follow(product, state)
-                result[product].extend(trend_orders)
+        # Market Making for KELP
+        product = Product.KELP
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
 
-        # Basket Arbitrage
+        # Market Making for RAINFOREST_RESIN
+        product = Product.RAINFOREST_RESIN
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
+
+        # Market Making for SQUID_INK
+        product = Product.SQUID_INK
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
+
+        # Market Making for CROISSANTS
+        product = Product.CROISSANTS
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
+
+        # Market Making for JAMS
+        product = Product.JAMS
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
+
+        # Market Making for DJEMBE
+        product = Product.DJEMBE
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+            trend_orders = self._trend_follow(product, state)
+            result[product].extend(trend_orders)
+
+        # Market Making for PICNIC_BASKET1
+        product = Product.PICNIC_BASKET1
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+
+        # Market Making for PICNIC_BASKET2
+        product = Product.PICNIC_BASKET2
+        if product in state.order_depths and product in self.current_fair_values:
+            order_depth = state.order_depths[product]
+            position = state.position.get(product, 0)
+            p_params = self.params[product]
+            fair_value = self.current_fair_values[product]
+            mm_orders_take = []
+            buy_vol_take, sell_vol_take = self._take_best_orders(product, fair_value, p_params["take_width"], mm_orders_take, order_depth, position)
+            result[product].extend(mm_orders_take)
+            mm_orders_make = self._make_orders(product, order_depth, fair_value, position, buy_vol_take, sell_vol_take)
+            result[product].extend(mm_orders_make)
+
+        # --- Basket Arbitrage Strategies ---
+
+        # Basket Arbitrage for PICNIC_BASKET1 and PICNIC_BASKET2
         arbitrage_orders = self.arbitrage_baskets(state)
         for order in arbitrage_orders:
-            # *** USE order.symbol (Corrected) ***
             if order.symbol in result:
                 result[order.symbol].append(order)
             else:
                 print(f"Warning: Arbitrage order generated for unexpected product symbol '{order.symbol}'. Discarding.")
-
 
         traderData = self._save_trader_data()
         conversions = 0
