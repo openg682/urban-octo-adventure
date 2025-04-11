@@ -124,9 +124,3 @@ class Trader:
         traderData = jsonpickle.encode(traderObject)
 
         return result, 0, traderData
-
-
-    # Instantiate and run the trader
-    trader = Trader()
-    result, _, _ = trader.run(trading_state)
-    print(result)
