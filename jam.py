@@ -15,6 +15,7 @@ PARAMS = {
         "join_edge": 0.5,
         "default_edge": 1.5,
         "soft_position_limit": 315,
+        "volatility_window": 10,  # Number of periods to calculate volatility
     },
 }
 
@@ -23,11 +24,43 @@ class Trader:
         self.params = PARAMS
         self.LIMIT = {p: 350 for p in PARAMS}
         self.mid_price_history = {product: [] for product in PARAMS}
+        self.volatility_history = {product: [] for product in PARAMS}
         self.window = 10
         self.default_min_spread = 1
 
+    def calculate_volatility(self, product, order_depth):
+        # Calculate market volatility based on price range
+        if len(self.mid_price_history[product]) < self.window:
+            return 0.0  # Not enough data to calculate volatility
+        
+        # Use the price range (high - low) in the last few periods
+        price_range = [max(order_depth.buy_orders) - min(order_depth.sell_orders) for _ in range(self.window)]
+        volatility = np.std(price_range)  # Standard deviation of price range
+        return volatility
+
+    def dynamic_spread(self, product, fair_value, order_depth):
+        # Adjust the spread based on volatility
+        volatility = self.calculate_volatility(product, order_depth)
+        if volatility == 0:
+            return self.default_min_spread  # Default spread if there's no volatility
+        
+        # Dynamically adjust the spread, larger spread with higher volatility
+        spread = max(self.default_min_spread, volatility * 0.5)
+        return spread
+
+    def dynamic_position_limit(self, product, order_depth):
+        # Adjust position limit based on volatility
+        volatility = self.calculate_volatility(product, order_depth)
+        base_limit = self.LIMIT[product]
+        
+        # Larger position limit in less volatile markets
+        if volatility < 50:
+            return base_limit * 1.5
+        else:
+            return base_limit * 0.75
+
     def take_best_orders(self, product, fair_value, take_width, orders, order_depth, position):
-        position_limit = self.LIMIT[product]
+        position_limit = self.dynamic_position_limit(product, order_depth)  # Adjust position limit based on volatility
         buy_volume = sell_volume = 0
 
         if abs(position) >= position_limit:
@@ -54,11 +87,11 @@ class Trader:
         return buy_volume, sell_volume
 
     def market_make(self, product, orders, bid, ask, position, buy_volume, sell_volume, order_depth):
-        buy_qty = self.LIMIT[product] - (position + buy_volume)
+        buy_qty = self.dynamic_position_limit(product, order_depth) - (position + buy_volume)
         if buy_qty > 0:
             orders.append(Order(product, round(bid, 1), buy_qty))
 
-        sell_qty = self.LIMIT[product] + (position - sell_volume)
+        sell_qty = self.dynamic_position_limit(product, order_depth) + (position - sell_volume)
         if sell_qty > 0:
             orders.append(Order(product, round(ask, 1), -sell_qty))
 
@@ -66,16 +99,17 @@ class Trader:
 
     def make_orders(self, product, order_depth, fair_value, position, buy_volume, sell_volume, disregard_edge, join_edge, default_edge):
         orders = []
+        spread = self.dynamic_spread(product, fair_value, order_depth)  # Get dynamic spread
         asks = [p for p in order_depth.sell_orders if p > fair_value + disregard_edge]
         bids = [p for p in order_depth.buy_orders if p < fair_value - disregard_edge]
         tick_size = 0.1
 
-        ask = round(fair_value + default_edge, 1)
+        ask = round(fair_value + spread, 1)
         if asks:
             best_ask = min(asks)
             ask = min(ask, round(best_ask - tick_size, 1)) if abs(best_ask - fair_value) <= join_edge else min(ask, round(best_ask - tick_size, 1))
 
-        bid = round(fair_value - default_edge, 1)
+        bid = round(fair_value - spread, 1)
         if bids:
             best_bid = max(bids)
             bid = max(bid, round(best_bid + tick_size, 1)) if abs(fair_value - best_bid) <= join_edge else max(bid, round(best_bid + tick_size, 1))
