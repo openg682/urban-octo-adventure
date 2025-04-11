@@ -120,7 +120,6 @@ class Trader:
         for key in self.persisted_keys:
              if hasattr(self, key):
                 data_to_save[key] = getattr(self, key)
-        # Ensure jsonpickle handles numpy types correctly if you add them later
         return jsonpickle.encode(data_to_save, unpicklable=False)
 
 
@@ -262,7 +261,6 @@ class Trader:
 
     def arbitrage_baskets(self, state: TradingState):
         orders: List[Order] = []; order_depths = state.order_depths; positions = state.position
-
         basket1_prod = Product.PICNIC_BASKET1; required_comps1 = Product.BASKET1_COMPONENTS
         component_prods1 = list(required_comps1.keys()); threshold1 = self.arbitrage_thresholds[basket1_prod]
         if basket1_prod in order_depths and all(comp in order_depths for comp in component_prods1):
@@ -328,6 +326,7 @@ class Trader:
                 except Exception as e: print(f"Error in Sell Basket 2 Arb: {e}")
         return orders
 
+
     # Main Run Function
     def run(self, state: TradingState):
         self._load_trader_data(state.traderData)
@@ -367,11 +366,11 @@ class Trader:
 
         # --- Prepare the final return dictionary ---
         conversions = 0
-        final_result = {        # *** FIX: Construct the dictionary ***
+        final_result = {        # *** Correct dictionary assignment ***
             "Orders": result,
             "Conversion": conversions,
             "TraderData": traderData
         }
 
         # --- Return the single dictionary ---
-        return final_result     # *** FIX: Return the dictionary ***
+        return final_result     # *** Return the constructed dictionary ***
