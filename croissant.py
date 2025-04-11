@@ -9,11 +9,11 @@ class Product:
 PARAMS = {
     Product.CROISSANTS: {
         "fair_value": 4300.0,
-        "take_width": 0.5,
-        "clear_width": 0.5,
-        "disregard_edge": 5,
-        "join_edge": 0.5,
-        "default_edge": 1,
+        "take_width": 15,
+        "clear_width": 10,
+        "disregard_edge": 30,
+        "join_edge": 5,
+        "default_edge": 10,
         "soft_position_limit": 225,
     },
 }
